@@ -1,0 +1,35 @@
+[
+  { "endpoint": { "watchEndpoint": { "videoId": "v5k3MxbIbiA" } } },
+  {
+    "watchNextResponse": {
+      "frameworkUpdates": {
+        "entityBatchUpdate": {
+          "mutations": [
+            { "entityKey": "someOtherEntity", "payload": { "unrelatedEntity": { "foo": 1 } } },
+            {
+              "entityKey": "EgpIRUFUU0VFS0VSIJICKAE%3D",
+              "type": "ENTITY_MUTATION_TYPE_REPLACE",
+              "payload": {
+                "macroMarkersListEntity": {
+                  "key": "EgpIRUFUU0VFS0VSIJICKAE%3D",
+                  "externalVideoId": "v5k3MxbIbiA",
+                  "markersList": {
+                    "markerType": "MARKER_TYPE_HEATMAP",
+                    "markers": [
+                      { "startMillis": "0", "durationMillis": "6170", "intensityScoreNormalized": 0.8210925433200841 },
+                      { "startMillis": "6170", "durationMillis": "6170", "intensityScoreNormalized": 0.33349824448625665 },
+                      { "startMillis": "12340", "durationMillis": "6170", "intensityScoreNormalized": 0.2533456556540802 }
+                    ],
+                    "markersMetadata": {
+                      "heatmapMetadata": { "maxHeightDp": 40, "minHeightDp": 4, "showHideAnimationDurationMillis": 200 }
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+]

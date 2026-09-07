@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="popup.css">
+  <title>AutoSkip</title>
+</head>
+<body>
+  <header>
+    <h1>AutoSkip</h1>
+    <label class="switch" title="Master switch">
+      <input type="checkbox" id="enabled">
+      <span class="slider"></span>
+    </label>
+  </header>
+
+  <section class="stats">
+    <div><strong id="stat-jumps">0</strong><span>jumps</span></div>
+    <div><strong id="stat-saved">0m</strong><span>skipped</span></div>
+    <div><strong id="stat-ads">0</strong><span>ads</span></div>
+    <div><strong id="stat-dialogs">0</strong><span>dialogs</span></div>
+  </section>
+
+  <section>
+    <h2>Actions</h2>
+    <label class="row"><input type="checkbox" id="jumpAhead"> Jump Ahead <em>(Premium)</em></label>
+    <label class="row"><input type="checkbox" id="adSkip"> Ad “Skip” button</label>
+    <label class="row"><input type="checkbox" id="continueWatching"> “Continue watching?” dialog</label>
+    <label class="row"><input type="checkbox" id="suggestedChips"> “Skip intro” chips</label>
+  </section>
+
+  <section>
+    <h2>Tuning</h2>
+    <label class="row num">Max jumps per video <input type="number" id="maxJumpsPerVideo" min="1" max="200"></label>
+    <label class="row num">Cooldown between jumps (ms) <input type="number" id="cooldownMs" min="0" max="60000" step="100"></label>
+    <label class="row"><input type="checkbox" id="tier2Fallback"> Fall back to clicking the chip</label>
+  </section>
+
+  <section>
+    <h2>This video</h2>
+    <p class="muted" id="current">—</p>
+    <button id="block-video" class="btn">Never auto-skip this video</button>
+  </section>
+
+  <section>
+    <h2>Blocklist <span class="muted">channel name or video id, one per line</span></h2>
+    <textarea id="blocklist" rows="3" spellcheck="false" placeholder="Some Music Channel&#10;dQw4w9WgXcQ"></textarea>
+  </section>
+
+  <section>
+    <h2>Diagnostics</h2>
+    <label class="row"><input type="checkbox" id="debug"> Debug logging <em>(console)</em></label>
+    <label class="row"><input type="checkbox" id="captureMode"> Capture mode — log what you click</label>
+    <label class="row"><input type="checkbox" id="forceTier2"> Force chip-clicking (disable marker path)</label>
+    <button id="reset-stats" class="btn subtle">Reset stats</button>
+  </section>
+
+  <footer><span id="saved-hint"></span></footer>
+
+  <script src="../common/defaults.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

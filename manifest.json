@@ -1,0 +1,44 @@
+{
+  "manifest_version": 3,
+  "name": "AutoSkip for YouTube",
+  "version": "0.1.0",
+  "description": "Automatically performs YouTube Premium's Jump Ahead, plus ad skip, skip-intro chips, and the 'Continue watching?' dialog.",
+  "minimum_chrome_version": "111",
+  "permissions": ["storage", "activeTab"],
+  "host_permissions": ["*://*.youtube.com/*"],
+  "background": {
+    "service_worker": "src/sw.js"
+  },
+  "action": {
+    "default_title": "AutoSkip",
+    "default_popup": "src/popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://www.youtube.com/*", "*://m.youtube.com/*"],
+      "js": ["src/core/markers.js", "src/main/inject.js"],
+      "run_at": "document_start",
+      "world": "MAIN",
+      "all_frames": false
+    },
+    {
+      "matches": ["*://www.youtube.com/*", "*://m.youtube.com/*"],
+      "js": ["src/common/defaults.js", "src/isolated/bridge.js", "src/isolated/dom-actions.js"],
+      "run_at": "document_start",
+      "world": "ISOLATED",
+      "all_frames": false
+    }
+  ]
+}

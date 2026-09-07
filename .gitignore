@@ -1,0 +1,30 @@
+# Chrome extension packaging output.
+# *.pem is the PRIVATE SIGNING KEY that owns the extension's ID — Chrome's
+# "Pack extension" writes it next to the folder. Never commit it.
+*.pem
+*.crx
+*.zip
+dist/
+web-ext-artifacts/
+
+# Tooling, if any ever gets added (the extension itself needs no build step).
+node_modules/
+npm-debug.log*
+yarn-error.log*
+.npm/
+
+# macOS
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*~
+
+# Local scratch
+*.local
+scratch/

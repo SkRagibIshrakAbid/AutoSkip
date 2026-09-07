@@ -1,0 +1,70 @@
+{
+  "responseContext": { "visitorData": "Cgt0ZXN0" },
+  "videoDetails": { "videoId": "dQw4w9WgXcQ", "title": "Sample" },
+  "frameworkUpdates": {
+    "entityBatchUpdate": {
+      "mutations": [
+        {
+          "entityKey": "heatmapKey",
+          "type": "ENTITY_MUTATION_TYPE_REPLACE",
+          "payload": {
+            "macroMarkersListEntity": {
+              "key": "heatmapKey",
+              "externalVideoId": "dQw4w9WgXcQ",
+              "markersList": {
+                "markerType": "MARKER_TYPE_HEATMAP",
+                "markers": [
+                  { "startMillis": "0", "durationMillis": "5000", "intensityScoreNormalized": 0.9 },
+                  { "startMillis": "5000", "durationMillis": "5000", "intensityScoreNormalized": 0.2 }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "entityKey": "timestampsKey",
+          "type": "ENTITY_MUTATION_TYPE_REPLACE",
+          "payload": {
+            "macroMarkersListEntity": {
+              "key": "timestampsKey",
+              "externalVideoId": "dQw4w9WgXcQ",
+              "markersList": {
+                "markerType": "MARKER_TYPE_TIMESTAMPS",
+                "markers": [
+                  {
+                    "title": { "simpleText": "Intro" },
+                    "startMillis": "0",
+                    "durationMillis": "12000",
+                    "sourceType": "SOURCE_TYPE_AUTO_CHAPTERS"
+                  },
+                  {
+                    "title": { "simpleText": "Jump ahead" },
+                    "startMillis": "30000",
+                    "durationMillis": "45000",
+                    "sourceType": "SOURCE_TYPE_SMART_SKIP",
+                    "onActive": {
+                      "innertubeCommand": {
+                        "clickTrackingParams": "abc",
+                        "seekToVideoTimestampCommand": {
+                          "seekTimeMillis": "72000"
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "title": { "simpleText": "Jump ahead" },
+                    "startMillis": "60000",
+                    "sourceType": "SOURCE_TYPE_SMART_SKIP",
+                    "onActive": {
+                      "innertubeCommand": { "clickTrackingParams": "def" }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}
