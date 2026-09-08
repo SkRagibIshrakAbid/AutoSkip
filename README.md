@@ -46,6 +46,18 @@ backwards, never re-skip the same segment, always leave a way out.
 
 ---
 
+## Status
+
+**Pre-release.** Load it unpacked for now.
+
+Once testing is complete and every feature is confirmed working on real accounts
+— the LLM backends against live endpoints, the "Continue watching?" dialog
+against a real one, and sponsor skip across enough videos to trust it — this is
+headed for the **Chrome Web Store**. The open items are listed under
+[Known limits](#known-limits); they are the gate.
+
+---
+
 ## Install
 
 1. Open `chrome://extensions`
