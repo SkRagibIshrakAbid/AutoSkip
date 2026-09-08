@@ -9,19 +9,15 @@ const fs = require('fs');
 const path = require('path');
 const M = require('../src/core/markers.js');
 
-const fixture = JSON.parse(
-  fs.readFileSync(path.join(__dirname, '..', 'fixtures', 'macro-markers.sample.json'), 'utf8')
-);
+const fx = n => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'fixtures', n), 'utf8'));
+const timely = fx('timely-actions.sample.json');
+const real = fx('real-get-watch.json');
+const legacy = fx('macro-markers.sample.json');
 
-let passed = 0;
-let failed = 0;
-
+let passed = 0, failed = 0;
 function test(name, fn) {
-  try {
-    fn();
-    passed++;
-    console.log('  ok   ' + name);
-  } catch (err) {
+  try { fn(); passed++; console.log('  ok   ' + name); }
+  catch (err) {
     failed++;
     console.log('  FAIL ' + name);
     console.log('       ' + err.message.split('\n').join('\n       '));
@@ -30,222 +26,196 @@ function test(name, fn) {
 
 console.log('\nAutoSkip core logic\n');
 
-// ---------------------------------------------------------------- extraction
+// ─────────────────────────────────────────── timelyActions (primary source)
 
-test('finds the video id the payload is about', () => {
-  assert.strictEqual(M.findVideoId(fixture), 'dQw4w9WgXcQ');
+test('extracts Jump Ahead segments from timelyActions', () => {
+  const segs = M.extractJumpAheadSegments(timely);
+  assert.strictEqual(segs.length, 2, 'two jumpable actions, the shopping one excluded');
+  assert.strictEqual(segs[0].triggerMs, 30000);
+  assert.strictEqual(segs[0].seekTargetMs, 72000);
+  assert.strictEqual(segs[0].source, 'timely-actions');
 });
 
-test('extracts only SMART_SKIP markers, ignoring heatmap and chapters', () => {
-  const markers = M.extractSmartSkipMarkers(fixture);
-  assert.strictEqual(markers.length, 2, 'expected 2 smart-skip markers');
-  assert.ok(markers.every(m => m.sourceType === M.SMART_SKIP));
-  assert.strictEqual(markers[0].title, 'Jump ahead');
+test('THE REGRESSION TRAP: picks the right seekToVideoTimestampCommand', () => {
+  // onTap's first command also carries a seekToVideoTimestampCommand, with
+  // offset 0. A blind deep search returns that one and the jump goes nowhere.
+  const segs = M.extractJumpAheadSegments(timely);
+  assert.strictEqual(segs[0].seekTargetMs, 72000,
+    'must skip the decoy command and take the real destination');
+  assert.notStrictEqual(segs[0].seekTargetMs, 0);
 });
 
-test('carries the server-supplied localized title through', () => {
-  const localized = JSON.parse(JSON.stringify(fixture));
-  const list = localized.frameworkUpdates.entityBatchUpdate.mutations[1]
-    .payload.macroMarkersListEntity.markersList;
-  list.markers[1].title = { runs: [{ text: 'Passer ' }, { text: 'en avant' }] };
-  const markers = M.extractSmartSkipMarkers(localized);
-  assert.strictEqual(markers[0].title, 'Passer en avant');
+test('reads the field as offsetFromVideoStartMilliseconds, not ...Millis', () => {
+  const wrongName = { serialCommand: { commands: [
+    { innertubeCommand: { seekToVideoTimestampCommand: { offsetFromVideoStartMillis: '5000' } } }
+  ] } };
+  assert.strictEqual(M.extractSeekTargetFromOnTap(wrongName), null,
+    'the abbreviated spelling is not what YouTube sends');
 });
 
-test('returns [] for a payload with no smart-skip data (non-Premium case)', () => {
-  assert.deepStrictEqual(M.extractSmartSkipMarkers({ foo: { bar: [1, 2, 3] } }), []);
-  assert.deepStrictEqual(M.extractSmartSkipMarkers(null), []);
+test('supports commandExecutorCommand as well as serialCommand', () => {
+  const segs = M.extractJumpAheadSegments(timely);
+  assert.strictEqual(segs[1].triggerMs, 120000);
+  assert.strictEqual(segs[1].seekTargetMs, 155000);
 });
 
-test('survives cyclic objects without hanging', () => {
-  const cyclic = { a: {} };
-  cyclic.a.self = cyclic;
-  assert.deepStrictEqual(M.extractSmartSkipMarkers(cyclic), []);
+test('supports a direct onTap command with no wrapper list', () => {
+  assert.strictEqual(
+    M.extractSeekTargetFromOnTap({ seekToVideoTimestampCommand: { offsetFromVideoStartMilliseconds: '9000' } }),
+    9000
+  );
 });
 
-test('prefers videoDetails over a related video that appears earlier', () => {
-  const payload = {
-    contents: { results: [{ videoId: 'AAAAAAAAAAA' }, { videoId: 'CCCCCCCCCCC' }] },
-    videoDetails: { videoId: 'BBBBBBBBBBB', title: 'the actual video' }
-  };
-  assert.strictEqual(M.findVideoId(payload), 'BBBBBBBBBBB');
+test('ignores a timely action that is not a jump (shopping link)', () => {
+  const rejected = [];
+  M.extractJumpAheadSegments(timely, rejected);
+  assert.ok(rejected.some(r => r.reason === 'no-seek-target' && r.label === 'Shop now'),
+    'the Shop now action must be rejected, with a reason recorded');
 });
 
-test('externalVideoId on the marker entity outranks everything else', () => {
-  const payload = {
-    videoDetails: { videoId: 'BBBBBBBBBBB' },
-    payloadWrapper: { macroMarkersListEntity: { externalVideoId: 'ZZZZZZZZZZZ' } }
-  };
-  assert.strictEqual(M.findVideoId(payload), 'ZZZZZZZZZZZ');
+test('records why each entry was rejected (diagnostics depend on this)', () => {
+  const rejected = [];
+  M.extractJumpAheadSegments({ timelyActions: [{ notAViewModel: 1 }] }, rejected);
+  assert.strictEqual(rejected[0].reason, 'no-view-model');
 });
 
-test('falls through to a bare videoId when nothing better exists', () => {
-  assert.strictEqual(M.findVideoId({ a: { b: { videoId: 'QQQQQQQQQQQ' } } }), 'QQQQQQQQQQQ');
-  assert.strictEqual(M.findVideoId({ a: { videoId: 'too-short' } }), null);
+test('rejects an implausible jump distance', () => {
+  const tooSmall = M.makeSyntheticPayload({ videoId: 'x', triggerMs: 1000, seekTargetMs: 1500 });
+  assert.deepStrictEqual(M.extractJumpAheadSegments(tooSmall), []);
+  const tooBig = M.makeSyntheticPayload({ videoId: 'x', triggerMs: 0, seekTargetMs: 5000000 });
+  assert.deepStrictEqual(M.extractJumpAheadSegments(tooBig), []);
 });
 
-// ------------------------------------------------------------- range building
+test('finds timelyActions no matter what wraps it', () => {
+  const buried = { a: { b: [{ c: { timelyActions: timely.playerOverlays.timelyActionsOverlayViewModel.timelyActions } }] } };
+  assert.strictEqual(M.extractJumpAheadSegments(buried).length, 2);
+});
 
-test('builds ranges and clips an overlap against the next range start', () => {
-  const ranges = M.buildRanges(M.extractSmartSkipMarkers(fixture));
-  assert.strictEqual(ranges.length, 2);
-  // 30000 + 45000 = 75000, but the next marker starts at 60000 -> clipped.
-  assert.strictEqual(ranges[0].start, 30000);
-  assert.strictEqual(ranges[0].end, 60000, 'first range should be clipped to 60000');
+test('carries the server-supplied localized label', () => {
+  const p = M.makeSyntheticPayload({ videoId: 'x', triggerMs: 1000, seekTargetMs: 20000, label: 'Passer en avant' });
+  assert.strictEqual(M.extractJumpAheadSegments(p)[0].label, 'Passer en avant');
+});
+
+test('survives cyclic objects and junk input', () => {
+  const cyclic = { a: {} }; cyclic.a.self = cyclic;
+  assert.deepStrictEqual(M.extractJumpAheadSegments(cyclic), []);
+  assert.deepStrictEqual(M.extractJumpAheadSegments(null), []);
+  assert.strictEqual(M.extractSeekTargetFromOnTap(null), null);
+});
+
+// ─────────────────────────────────────────── smart-skip markers (secondary)
+
+test('still reads legacy SOURCE_TYPE_SMART_SKIP markers', () => {
+  const segs = M.extractSmartSkipSegments(legacy);
+  assert.strictEqual(segs.length, 2);
+  assert.strictEqual(segs[0].triggerMs, 30000);
+  assert.strictEqual(segs[0].seekTargetMs, 75000);
 });
 
 test('applies the 10s default when durationMillis is absent', () => {
-  const ranges = M.buildRanges(M.extractSmartSkipMarkers(fixture));
-  assert.strictEqual(ranges[1].start, 60000);
-  assert.strictEqual(ranges[1].end, 70000);
+  const segs = M.extractSmartSkipSegments(legacy);
+  assert.strictEqual(segs[1].seekTargetMs, segs[1].triggerMs + 10000);
 });
 
-test('sorts out-of-order markers before clipping', () => {
-  const ranges = M.buildRanges([
-    { startMillis: 90000, durationMillis: 5000, title: 'b', command: null },
-    { startMillis: 10000, durationMillis: 5000, title: 'a', command: null }
-  ]);
-  assert.deepStrictEqual(ranges.map(r => r.start), [10000, 90000]);
+test('combines both sources without duplicating', () => {
+  const both = M.extractAllSegments(timely);
+  assert.strictEqual(both.length, 2, 'timelyActions only; no smart-skip markers here');
+});
+
+// ─────────────────────────────────────────────────────────── range building
+
+test('builds ranges and clips an overlap against the next trigger', () => {
+  const ranges = M.buildRanges(M.extractSmartSkipSegments(legacy));
+  assert.strictEqual(ranges[0].start, 30000);
+  assert.strictEqual(ranges[0].end, 60000, 'clipped to the next trigger at 60000');
 });
 
 test('drops ranges that clip down to zero length', () => {
   const ranges = M.buildRanges([
-    { startMillis: 5000, durationMillis: 60000, title: 'a', command: null },
-    { startMillis: 5000, durationMillis: 10000, title: 'b', command: null }
+    { triggerMs: 5000, seekTargetMs: 65000, label: 'a' },
+    { triggerMs: 5000, seekTargetMs: 15000, label: 'b' }
   ]);
-  assert.strictEqual(ranges.length, 1, 'the zero-length first range should be dropped');
-  assert.strictEqual(ranges[0].start, 5000);
+  assert.strictEqual(ranges.length, 1);
 });
 
-// -------------------------------------------------------- command / target
-
-test('parses a millisecond seek offset out of a nested command', () => {
-  const ranges = M.buildRanges(M.extractSmartSkipMarkers(fixture));
-  assert.strictEqual(M.parseSeekCommand(ranges[0].command), 72000);
-});
-
-test('parses a seconds-based seek offset', () => {
-  assert.strictEqual(M.parseSeekCommand({ watchEndpoint: { startTimeSeconds: 42 } }), 42000);
-});
-
-test('returns NaN for an unrecognized command shape', () => {
-  assert.ok(Number.isNaN(M.parseSeekCommand({ clickTrackingParams: 'x' })));
-  assert.ok(Number.isNaN(M.parseSeekCommand(null)));
-});
-
-test('command target wins when present', () => {
-  const ranges = M.buildRanges(M.extractSmartSkipMarkers(fixture));
-  const t = M.resolveTarget(ranges[0]);
-  assert.strictEqual(t.source, 'command');
-  assert.strictEqual(t.millis, 72000);
-});
-
-test('falls back to range end when the command is unusable', () => {
-  const ranges = M.buildRanges(M.extractSmartSkipMarkers(fixture));
-  const t = M.resolveTarget(ranges[1]);
-  assert.strictEqual(t.source, 'range-end');
-  assert.strictEqual(t.millis, 70000);
-});
-
-test('ignores a command target that points backwards', () => {
-  const t = M.resolveTarget({
-    start: 30000, end: 60000,
-    command: { seekToVideoTimestampCommand: { seekTimeMillis: '1000' } }
-  });
-  assert.strictEqual(t.source, 'range-end', 'a backwards command target must be ignored');
-  assert.strictEqual(t.millis, 60000);
-});
-
-// ------------------------------------------------- real captured YouTube data
+// ────────────────────────────────────── real captured data (no false jumps)
 
 /**
- * Captured live from www.youtube.com on a signed-out session: the response to
- * /youtubei/v1/get_watch during an SPA navigation. Note the shape — the whole
- * response is a top-level ARRAY, and the markers sit at
- *   [1].watchNextResponse.frameworkUpdates.entityBatchUpdate.mutations[1].payload
- * A fixed key path from the root would find nothing here, which is why the
- * parser walks structurally instead.
+ * Captured live from youtube.com: the /youtubei/v1/get_watch response during
+ * an SPA navigation. The whole response is a top-level ARRAY with the payload
+ * at [1].watchNextResponse.… — a fixed key path from the root finds nothing,
+ * which is why extraction walks structurally.
  */
-const real = JSON.parse(
-  fs.readFileSync(path.join(__dirname, '..', 'fixtures', 'real-get-watch.json'), 'utf8')
-);
-
 test('[real data] walks a top-level array response', () => {
-  const lists = M.findMarkerLists(real);
-  assert.strictEqual(lists.length, 1, 'should find the heatmap list inside the array response');
-  assert.strictEqual(lists[0].markerType, 'MARKER_TYPE_HEATMAP');
-});
-
-test('[real data] reads the video id out of a get_watch response', () => {
   assert.strictEqual(M.findVideoId(real), 'v5k3MxbIbiA');
 });
 
+test('[real data] produces no jumps from a video that has none', () => {
+  assert.deepStrictEqual(M.extractAllSegments(real), []);
+  assert.deepStrictEqual(M.buildRanges(M.extractAllSegments(real)), []);
+});
+
 test('[real data] never mistakes heatmap markers for jump-ahead', () => {
-  assert.deepStrictEqual(M.extractSmartSkipMarkers(real), [],
-    'heatmap markers have no sourceType and must not produce jumps');
-  assert.deepStrictEqual(M.buildRanges(M.extractSmartSkipMarkers(real)), []);
+  const heat = M.findDeepAll(real, 'markers')[0];
+  assert.ok(heat.length >= 3 && heat[0].intensityScoreNormalized !== undefined);
+  assert.deepStrictEqual(M.extractSmartSkipSegments(real), []);
 });
 
-test('[real data] handles string-typed millis fields', () => {
-  const lists = M.findMarkerLists(real);
-  const m = lists[0].markers[1];
-  assert.strictEqual(typeof m.startMillis, 'string', 'YouTube really does send these as strings');
-  const ranges = M.buildRanges([{ startMillis: Number(m.startMillis), durationMillis: Number(m.durationMillis), title: '', command: null }]);
-  assert.strictEqual(ranges[0].start, 6170);
-  assert.strictEqual(ranges[0].end, 12340);
+// ───────────────────────────────────────────────────────────── video id
+
+test('prefers videoDetails over a related video appearing earlier', () => {
+  assert.strictEqual(M.findVideoId({
+    contents: { results: [{ videoId: 'AAAAAAAAAAA' }] },
+    videoDetails: { videoId: 'BBBBBBBBBBB' }
+  }), 'BBBBBBBBBBB');
 });
 
-// ------------------------------------------------------------ jump decision
+test('externalVideoId outranks everything else', () => {
+  assert.strictEqual(M.findVideoId({
+    videoDetails: { videoId: 'BBBBBBBBBBB' },
+    w: { macroMarkersListEntity: { externalVideoId: 'ZZZZZZZZZZZ' } }
+  }), 'ZZZZZZZZZZZ');
+});
 
-const RANGES = M.buildRanges(M.extractSmartSkipMarkers(fixture));
+// ──────────────────────────────────────────────────────── jump decision
 
-test('jumps when the playhead is inside a range', () => {
+const RANGES = M.buildRanges(M.extractJumpAheadSegments(timely));
+
+test('jumps when the playhead enters a range', () => {
   const d = M.decideJump({ ranges: RANGES, currentMillis: 31000, consumed: new Set() });
   assert.strictEqual(d.jump, true);
-  assert.strictEqual(d.target.millis, 72000);
+  assert.strictEqual(d.targetMillis, 72000);
   assert.strictEqual(d.savedMillis, 41000);
 });
 
 test('does not jump outside every range', () => {
-  const d = M.decideJump({ ranges: RANGES, currentMillis: 5000, consumed: new Set() });
-  assert.strictEqual(d.jump, false);
-  assert.strictEqual(d.reason, 'not-in-range');
+  assert.strictEqual(M.decideJump({ ranges: RANGES, currentMillis: 5000, consumed: new Set() }).reason, 'not-in-range');
 });
 
 test('does not re-jump a consumed range (user scrubbed back in)', () => {
   const consumed = new Set([RANGES[0].id]);
-  const d = M.decideJump({ ranges: RANGES, currentMillis: 31000, consumed });
-  assert.strictEqual(d.jump, false);
-  assert.strictEqual(d.reason, 'not-in-range');
+  assert.strictEqual(M.decideJump({ ranges: RANGES, currentMillis: 31000, consumed }).jump, false);
 });
 
 test('never seeks backwards', () => {
-  const ranges = M.buildRanges([
-    { startMillis: 10000, durationMillis: 20000, title: 'x', command: null }
-  ]);
-  const d = M.decideJump({ ranges, currentMillis: 29900, consumed: new Set() });
-  assert.strictEqual(d.jump, false);
-  assert.strictEqual(d.reason, 'target-not-ahead');
-});
-
-test('suppresses pointlessly small jumps via minAdvanceMs', () => {
-  const ranges = M.buildRanges([
-    { startMillis: 0, durationMillis: 1000, title: 'x', command: null }
-  ]);
-  assert.strictEqual(
-    M.decideJump({ ranges, currentMillis: 900, consumed: new Set(), minAdvanceMs: 250 }).jump,
-    false
-  );
-  assert.strictEqual(
-    M.decideJump({ ranges, currentMillis: 700, consumed: new Set(), minAdvanceMs: 250 }).jump,
-    true
-  );
+  const ranges = M.buildRanges([{ triggerMs: 10000, seekTargetMs: 30000, label: 'x' }]);
+  assert.strictEqual(M.decideJump({ ranges, currentMillis: 29900, consumed: new Set() }).reason, 'target-not-ahead');
 });
 
 test('does nothing with no ranges at all', () => {
-  const d = M.decideJump({ ranges: [], currentMillis: 1000, consumed: new Set() });
-  assert.strictEqual(d.jump, false);
-  assert.strictEqual(d.reason, 'no-ranges');
+  assert.strictEqual(M.decideJump({ ranges: [], currentMillis: 1000, consumed: new Set() }).reason, 'no-ranges');
+});
+
+// ───────────────────────────────────────────────────────────── simulate()
+
+test('makeSyntheticPayload round-trips through the real extraction path', () => {
+  const p = M.makeSyntheticPayload({ videoId: 'abcdefghijk', triggerMs: 12000, seekTargetMs: 48000 });
+  assert.strictEqual(M.findVideoId(p), 'abcdefghijk');
+  const segs = M.extractJumpAheadSegments(p);
+  assert.strictEqual(segs.length, 1);
+  assert.strictEqual(segs[0].seekTargetMs, 48000, 'must survive the decoy command it embeds');
+  const ranges = M.buildRanges(segs);
+  assert.strictEqual(M.decideJump({ ranges, currentMillis: 12500, consumed: new Set() }).targetMillis, 48000);
 });
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed\n');

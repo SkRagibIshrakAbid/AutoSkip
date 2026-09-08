@@ -31,15 +31,44 @@
     'ytd-popup-container tp-yt-paper-dialog #confirm-button'
   ];
 
-  // Last-resort selectors for the Jump ahead chip. The reliable match is the
-  // server-supplied localized title from tier 1; these only cover the case
-  // where tier 1 produced nothing at all.
+  // `.ytp-jump-ahead-button` is the real one, confirmed against a working
+  // third-party implementation.
   var JUMP_CHIP = [
     '.ytp-jump-ahead-button',
     '.ytp-jump-ahead',
     '#movie_player [class*="jump-ahead"]',
     '#movie_player [class*="smart-skip"]'
   ];
+
+  var JUMP_LABEL = /\b(jump ahead|skip ahead)\b/i;
+
+  function hasJumpLikeClass(el) {
+    var cls = (el.className || '').toString();
+    return /ytp-(?:jump-ahead|smart-skip)/i.test(cls);
+  }
+
+  function controlText(el) {
+    return [
+      el.innerText || '',
+      el.textContent || '',
+      (el.getAttribute && el.getAttribute('aria-label')) || '',
+      (el.getAttribute && el.getAttribute('title')) || '',
+      (el.getAttribute && el.getAttribute('data-title-no-tooltip')) || ''
+    ].join(' ').replace(/\s+/g, ' ').trim();
+  }
+
+  function hasLayout(el) {
+    if (!el) return false;
+    var r = el.getBoundingClientRect();
+    return r.width > 0 && r.height > 0;
+  }
+
+  function toMain(type, data) {
+    var msg = { dir: 'iso->main', type: type };
+    msg[D.TAG] = true;
+    if (data) for (var k in data) msg[k] = data[k];
+    try { window.postMessage(msg, location.origin); } catch (e) { /* ignore */ }
+  }
 
   // Intentionally narrow: a suggested-action badge can also be a shopping link.
   var SKIPPY = /\b(skip|jump|ahead|intro|recap|passer|saltar|überspringen|sauter|пропустить|スキップ|건너뛰기)\b/i;
@@ -49,6 +78,7 @@
   var clicked = new WeakSet();
   var nudges = 0;
   var lastNudgeAt = 0;
+  var lastSighting = null;
 
   ['pointerdown', 'keydown', 'wheel'].forEach(function (evt) {
     window.addEventListener(evt, function (e) {
@@ -182,10 +212,15 @@
   // --------------------------------------------------------- tier 2: jump chip
 
   /**
-   * 'active'  - tier 1 never reported on this video, so it may be broken.
-   *             Worth nudging the controls visible to find the chip.
-   * 'passive' - tier 1 works and says this video has no jump-ahead data.
-   *             Click the chip if it shows up, but never synthesize input.
+   * 'active'  - no usable data from the seek path for this video, so the chip
+   *             is the only route. Worth revealing the controls to use it.
+   * 'passive' - the seek path has ranges and will handle this video; only
+   *             click a chip that happens to be sitting there already.
+   *
+   * Earlier this returned 'passive' whenever the seek path had reported
+   * "no data for this video" — which is precisely the case where the chip is
+   * the ONLY thing that can work. Combined with passive mode refusing to
+   * reveal the controls the chip needs, that made the fallback unreachable.
    */
   function tier2Mode() {
     if (shared.settings.forceTier2) return 'active';
@@ -194,42 +229,75 @@
     var vid = currentVideoId();
     if (!vid) return 'off';
     var reported = shared.reported[vid];
-    if (reported) return reported.hasMarkers ? 'off' : 'passive';
+    if (reported && reported.hasMarkers) return 'passive';
     return 'active';
   }
 
+  /**
+   * CRITICAL: this must not require layout.
+   *
+   * YouTube keeps the Jump Ahead chip in the DOM at 0x0 while the player
+   * controls are hidden. Filtering on getBoundingClientRect() — which every
+   * other action here does, correctly — throws away the exact element we are
+   * looking for. That single mistake is enough to make the whole feature look
+   * completely dead.
+   */
   function findJumpChip() {
-    var player = document.getElementById('movie_player');
+    var player = document.getElementById('movie_player') ||
+      document.querySelector('.html5-video-player');
     if (!player) return null;
 
-    // Best match: the server's own localized label, captured by tier 1.
-    var reported = shared.reported[currentVideoId()];
-    var titles = ((reported && reported.titles) || []).filter(Boolean);
-    if (titles.length) {
-      var candidates = player.querySelectorAll('button, [role="button"], .ytp-button');
-      for (var i = 0; i < candidates.length; i++) {
-        var el = candidates[i];
-        if (!visible(el) || clicked.has(el)) continue;
-        var label = textOf(el);
-        if (!label) continue;
-        for (var j = 0; j < titles.length; j++) {
-          if (label.toLowerCase().indexOf(titles[j].toLowerCase()) !== -1) return el;
-        }
-      }
+    // Known selectors, no layout check.
+    for (var i = 0; i < JUMP_CHIP.length; i++) {
+      var hit = player.querySelector(JUMP_CHIP[i]) || document.querySelector(JUMP_CHIP[i]);
+      if (hit) return hit;
     }
 
-    return firstVisible(JUMP_CHIP, player);
+    // Otherwise scan the player's controls by class or label. Tier 1 gives us
+    // the server's own localized title, so this works in any language.
+    var reported = shared.reported[currentVideoId()];
+    var titles = ((reported && reported.titles) || []).filter(Boolean);
+    var candidates = player.querySelectorAll('button, [role="button"], .ytp-button');
+    for (var j = 0; j < candidates.length; j++) {
+      var el = candidates[j];
+      if (hasJumpLikeClass(el)) return el;
+      var label = controlText(el);
+      if (!label) continue;
+      if (JUMP_LABEL.test(label)) return el;
+      for (var k = 0; k < titles.length; k++) {
+        if (titles[k] && label.toLowerCase().indexOf(titles[k].toLowerCase()) !== -1) return el;
+      }
+    }
+    return null;
   }
 
   function doJumpChip() {
     var mode = tier2Mode();
-    if (mode === 'off') return;
-    if (shared.blocked) return;
+    if (mode === 'off' || shared.blocked) return;
 
     var chip = findJumpChip();
+
     if (chip) {
+      // A sighting proves YouTube has jump data for this video right now.
+      // Tell the engine: if it extracted nothing, its parsing needs attention.
+      var key = currentVideoId() + '|' + (chip.className || '').toString();
+      if (key !== lastSighting) {
+        lastSighting = key;
+        toMain('chip-sighting', { videoId: currentVideoId() });
+        shared.log('jump chip sighted', describe(chip));
+      }
+
+      if (mode === 'passive') return;   // the seek path owns this video
+
+      // Clicking a 0x0 hidden overlay silently does nothing, so reveal the
+      // controls first and click on a following scan once it has layout.
+      if (!hasLayout(chip)) {
+        revealControls('chip present but 0x0 — revealing controls to click it');
+        return;
+      }
+
       if (!cooled('jumpchip', shared.settings.cooldownMs || 1500)) return;
-      if (click(chip, 'tier-2 jump chip')) {
+      if (click(chip, 'jump chip')) {
         nudges = 0;
         shared.bump({ jumps: 1 });
       }
@@ -238,13 +306,17 @@
 
     if (mode !== 'active') return;
 
-    // The chip only renders while the controls are visible, so make them
-    // visible. Capped so a video that simply has no jump-ahead doesn't end up
-    // with its controls pinned open forever.
+    // No chip in the DOM at all. It may only be built once the controls show,
+    // so nudge them visible — capped, so a video that simply has no Jump Ahead
+    // never ends up with its controls pinned open.
+    if (nudges >= 24) return;
+    revealControls('no chip yet — nudge ' + (nudges + 1));
+  }
+
+  function revealControls(why) {
     var video = getVideo();
     if (!video || video.paused) return;
-    if (nudges >= 24) return;
-    if (Date.now() - lastNudgeAt < 5000) return;
+    if (Date.now() - lastNudgeAt < 2000) return;
     lastNudgeAt = Date.now();
     nudges++;
 
@@ -258,7 +330,7 @@
         bubbles: true, cancelable: true, view: window, clientX: x, clientY: y
       }));
     });
-    shared.log('tier-2 nudge', nudges, '- revealing controls to look for the chip');
+    shared.log('reveal controls:', why);
   }
 
   // ------------------------------------------------------------- capture mode

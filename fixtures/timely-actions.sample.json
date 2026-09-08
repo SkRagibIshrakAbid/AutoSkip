@@ -1,0 +1,69 @@
+{
+  "videoDetails": { "videoId": "dQw4w9WgXcQ" },
+  "playerOverlays": {
+    "timelyActionsOverlayViewModel": {
+      "timelyActions": [
+        {
+          "timelyActionViewModel": {
+            "startTimeMilliseconds": "30000",
+            "content": {
+              "buttonViewModel": {
+                "title": "Jump ahead",
+                "accessibilityText": "Jump ahead to the next part"
+              }
+            },
+            "rendererContext": {
+              "commandContext": {
+                "onTap": {
+                  "serialCommand": {
+                    "commands": [
+                      {
+                        "innertubeCommand": {
+                          "loggingUrls": [{ "baseUrl": "https://www.youtube.com/pagead" }],
+                          "seekToVideoTimestampCommand": {
+                            "offsetFromVideoStartMilliseconds": "0"
+                          }
+                        }
+                      },
+                      {
+                        "innertubeCommand": {
+                          "seekToVideoTimestampCommand": {
+                            "offsetFromVideoStartMilliseconds": "72000"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "timelyActionViewModel": {
+            "startTimeMilliseconds": "120000",
+            "content": { "buttonViewModel": { "title": "Jump ahead" } },
+            "rendererContext": {
+              "commandContext": {
+                "onTap": {
+                  "commandExecutorCommand": {
+                    "commands": [
+                      { "seekToVideoTimestampCommand": { "offsetFromVideoStartMilliseconds": "155000" } }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "timelyActionViewModel": {
+            "startTimeMilliseconds": "200000",
+            "content": { "buttonViewModel": { "title": "Shop now" } },
+            "rendererContext": { "commandContext": { "onTap": { "urlEndpoint": { "url": "https://example.com" } } } }
+          }
+        }
+      ]
+    }
+  }
+}
