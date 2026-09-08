@@ -30,7 +30,32 @@
     captureMode: false,    // log the selector chain of anything clicked in the player
 
     // "channel name" or 11-char video id, one per line, case-insensitive
-    blocklist: []
+    blocklist: [],
+
+    // ── sponsor-segment skipping (non-Premium ad reads) ──────────────────
+    sponsorSkip: false,          // master switch; ships OFF
+    sbEnabled: true,             // SponsorBlock: free, instant, no transcript
+    llmEnabled: false,           // LLM fallback when SponsorBlock has nothing
+    llmProvider: 'ollama',
+    llmBaseUrl: '',              // blank = the provider's default
+    llmModel: '',                // blank = the provider's default
+    llmTimeoutMs: 90000,
+    segCategories: ['sponsor', 'selfpromo'],
+    minConfidence: 0.7,
+    minVideoSeconds: 180,        // below this, ad reads are rare; do not spend tokens
+    showToast: true
+  };
+
+  /**
+   * Secrets live under their own storage key, NEVER in `settings`.
+   *
+   * `settings` is pushed wholesale into the MAIN world, which shares scope with
+   * YouTube's own scripts. Keeping the API key in a separate key that only the
+   * service worker and popup ever read makes leaking it structurally
+   * impossible rather than a filtering mistake waiting to happen.
+   */
+  var SECRETS = {
+    llmApiKey: ''
   };
 
   var STATS = {
@@ -38,7 +63,10 @@
     millisSaved: 0,
     adsSkipped: 0,
     dialogsDismissed: 0,
-    chipsClicked: 0
+    chipsClicked: 0,
+    sponsorSkips: 0,
+    sponsorMillisSaved: 0,
+    llmCalls: 0
   };
 
   root.ASDefaults = {
@@ -46,8 +74,20 @@
     STATS: STATS,
     STORAGE_KEY: 'settings',
     STATS_KEY: 'stats',
+    SECRETS_KEY: 'secrets',
+    CACHE_INDEX_KEY: 'segCacheIndex',
+    SECRETS: SECRETS,
     TAG: '__autoskip',
     LOG_PREFIX: '[autoskip]',
+
+    withSecretDefaults: function (stored) {
+      var out = {};
+      for (var k in SECRETS) {
+        if (!Object.prototype.hasOwnProperty.call(SECRETS, k)) continue;
+        out[k] = stored && Object.prototype.hasOwnProperty.call(stored, k) ? stored[k] : SECRETS[k];
+      }
+      return out;
+    },
 
     withDefaults: function (stored) {
       var out = {};

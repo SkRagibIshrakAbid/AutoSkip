@@ -167,7 +167,7 @@
     if (!currentVideoId()) return;
 
     var quietFor = Date.now() - lastUserInputAt;
-    if (lastUserInputAt !== 0 && quietFor < 60000) return;
+    if (!selfTest.bypassQuiet && lastUserInputAt !== 0 && quietFor < 60000) return;
 
     var video = getVideo();
     if (!video || !video.paused) return;
@@ -359,6 +359,13 @@
     };
   }
 
+  window.addEventListener('message', function (ev) {
+    if (ev.source !== window) return;
+    var d = ev.data;
+    if (!d || d[D.TAG] !== true || d.dir !== 'main->iso') return;
+    if (d.type === 'selftest-run') runSelfTest(d.only);
+  });
+
   document.addEventListener('click', function (e) {
     if (!shared.settings.captureMode || !e.isTrusted) return;
     var el = e.target;
@@ -371,6 +378,171 @@
     for (var i = 0; n && i < 4; i++) { chainUp.push(describe(n)); n = n.parentElement; }
     console.log(D.LOG_PREFIX + ' [capture] ancestors:', chainUp);
   }, true);
+
+  // --------------------------------------------------------------- self-test
+
+  /**
+   * Synthesises the DOM YouTube would produce and checks whether the real
+   * scanning code clicks it. Exists because the other three actions are
+   * otherwise close to untestable on a Premium account: there are no ads to
+   * skip, and the idle dialog takes ~30 minutes of no interaction to appear.
+   *
+   * Every case builds a throwaway element, waits for a real click from the
+   * normal scan loop, then removes it and restores whatever it touched.
+   * Negative cases matter as much as positive ones — they prove the guards
+   * that stop this extension clicking a shopping link or a "delete comment"
+   * confirm actually hold.
+   */
+  var selfTest = { bypassQuiet: false };
+
+  function expectClick(el, shouldClick, timeoutMs, done) {
+    var got = false;
+    el.addEventListener('click', function () { got = true; }, true);
+    var t0 = Date.now();
+    var iv = setInterval(function () {
+      var elapsed = Date.now() - t0;
+      // A negative case has to wait out the full window to be meaningful.
+      if ((got && shouldClick) || elapsed > timeoutMs) {
+        clearInterval(iv);
+        done({ clicked: got, ms: elapsed, pass: got === shouldClick });
+      }
+    }, 60);
+  }
+
+  function el(tag, cls, text, attrs) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text) n.textContent = text;
+    if (attrs) for (var k in attrs) n.setAttribute(k, attrs[k]);
+    return n;
+  }
+
+  function playerEl() {
+    return document.getElementById('movie_player') || document.querySelector('.html5-video-player');
+  }
+
+  /**
+   * `yt-confirm-dialog-renderer` is a live custom element: appending children
+   * before it connects gets them wiped when Polymer upgrades and stamps its
+   * own template. Connect first, let the upgrade settle, then append — that
+   * survives, matches the selector, and dispatches clicks normally.
+   */
+  function buildConfirmDialog(labelText, cb) {
+    var dialog = el('yt-confirm-dialog-renderer');
+    dialog.style.cssText = 'position:fixed;top:20px;left:20px;z-index:99999;' +
+      'background:#222;color:#fff;padding:8px;display:block';
+    document.body.appendChild(dialog);
+
+    setTimeout(function () {
+      var wrap = el('div', null, null, { id: 'confirm-button' });
+      var btn = el('button', null, labelText);
+      btn.style.cssText = 'display:block;width:80px;height:30px;opacity:1;visibility:visible';
+      wrap.appendChild(btn);
+      dialog.appendChild(wrap);
+      cb(dialog, btn);
+    }, 250);
+  }
+
+  var CASES = {
+    adSkip: function (done) {
+      var player = playerEl();
+      if (!player) return done({ pass: false, note: 'no player on page' });
+      var addedAdClass = !player.classList.contains('ad-showing');
+      if (addedAdClass) player.classList.add('ad-showing');
+
+      var slot = el('div', 'ytp-ad-skip-button-slot');
+      var btn = el('button', 'ytp-ad-skip-button-modern ytp-button', 'Skip');
+      btn.style.cssText = 'display:block;position:absolute;bottom:70px;right:12px;width:90px;height:32px;opacity:1;visibility:visible;z-index:9999';
+      slot.appendChild(btn);
+      player.appendChild(slot);
+
+      expectClick(btn, true, 3000, function (r) {
+        slot.remove();
+        if (addedAdClass) player.classList.remove('ad-showing');
+        done(r);
+      });
+    },
+
+    skipIntroChip: function (done) {
+      var player = playerEl();
+      if (!player) return done({ pass: false, note: 'no player on page' });
+      var badge = el('div', 'ytp-button ytp-suggested-action-badge', null, { 'aria-label': 'Skip intro' });
+      badge.appendChild(el('span', 'ytp-suggested-action-badge-title', 'Skip intro'));
+      badge.style.cssText = 'display:block;position:absolute;bottom:70px;right:12px;width:90px;height:32px;opacity:1;visibility:visible;z-index:9999';
+      player.appendChild(badge);
+      expectClick(badge, true, 3000, function (r) { badge.remove(); done(r); });
+    },
+
+    // NEGATIVE: a shopping badge must never be auto-clicked.
+    shoppingBadgeIgnored: function (done) {
+      var player = playerEl();
+      if (!player) return done({ pass: false, note: 'no player on page' });
+      var badge = el('div', 'ytp-button ytp-suggested-action-badge ytp-featured-product', null,
+        { 'aria-label': 'Shop now' });
+      badge.appendChild(el('span', 'ytp-suggested-action-badge-title', 'Shop now'));
+      badge.style.cssText = 'display:block;position:absolute;bottom:70px;right:120px;width:90px;height:32px;opacity:1;visibility:visible;z-index:9999';
+      player.appendChild(badge);
+      expectClick(badge, false, 2500, function (r) { badge.remove(); done(r); });
+    },
+
+    continueWatching: function (done) {
+      var video = getVideo();
+      if (!video) return done({ pass: false, note: 'no video element' });
+      var wasPlaying = !video.paused;
+      video.pause();
+
+      buildConfirmDialog('Yes', function (dialog, btn) {
+        selfTest.bypassQuiet = true;   // the real guard needs 60s of silence
+        expectClick(btn, true, 3500, function (r) {
+          selfTest.bypassQuiet = false;
+          dialog.remove();
+          if (wasPlaying) { try { video.play(); } catch (e) {} }
+          r.note = 'quiet-period guard bypassed here; it is verified separately below';
+          done(r);
+        });
+      });
+    },
+
+    // NEGATIVE: the same dialog must NOT be confirmed right after real input.
+    // This is the guard that stops the extension ever auto-confirming
+    // something destructive the user just opened themselves.
+    confirmGuardHolds: function (done) {
+      var video = getVideo();
+      if (!video) return done({ pass: false, note: 'no video element' });
+      var wasPlaying = !video.paused;
+      video.pause();
+
+      buildConfirmDialog('Delete', function (dialog, btn) {
+        lastUserInputAt = Date.now();   // pretend the user just interacted
+        expectClick(btn, false, 2500, function (r) {
+          dialog.remove();
+          if (wasPlaying) { try { video.play(); } catch (e) {} }
+          r.note = 'a dialog the user just opened must never be auto-confirmed';
+          done(r);
+        });
+      });
+    }
+  };
+
+  function runSelfTest(only) {
+    var names = only && CASES[only] ? [only] : Object.keys(CASES);
+    var results = {};
+
+    function next(i) {
+      if (i >= names.length) {
+        toMain('selftest-result', { results: results });
+        return;
+      }
+      var name = names[i];
+      // Reset per-action cooldowns so consecutive cases don't starve.
+      lastAction = Object.create(null);
+      CASES[name](function (r) {
+        results[name] = r;
+        setTimeout(function () { next(i + 1); }, 200);
+      });
+    }
+    next(0);
+  }
 
   // -------------------------------------------------------------- scan driver
 

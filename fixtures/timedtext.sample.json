@@ -1,0 +1,833 @@
+{
+ "wireMagic": "pb3",
+ "events": [
+  {
+   "tStartMs": 0,
+   "dDurationMs": 100,
+   "segs": [
+    {
+     "utf8": "\n"
+    }
+   ]
+  },
+  {
+   "tStartMs": 0,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "hey everyone welcome back to the channel"
+    }
+   ]
+  },
+  {
+   "tStartMs": 2500,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "today we're looking at something a bit different"
+    }
+   ]
+  },
+  {
+   "tStartMs": 5000,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "but before we get into it"
+    }
+   ]
+  },
+  {
+   "tStartMs": 7500,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "this video is sponsored by NordVPN"
+    }
+   ]
+  },
+  {
+   "tStartMs": 10000,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "NordVPN keeps your connection private and secure"
+    }
+   ]
+  },
+  {
+   "tStartMs": 12500,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "and right now you can get seventy percent off"
+    }
+   ]
+  },
+  {
+   "tStartMs": 15000,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "by going to nordvpn dot com slash channel"
+    }
+   ]
+  },
+  {
+   "tStartMs": 17500,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "that link is also in the description below"
+    }
+   ]
+  },
+  {
+   "tStartMs": 20000,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "alright so with that out of the way"
+    }
+   ]
+  },
+  {
+   "tStartMs": 22500,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "let's get into the actual build"
+    }
+   ]
+  },
+  {
+   "tStartMs": 25000,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "the next step was to measure the frame again 0"
+    }
+   ]
+  },
+  {
+   "tStartMs": 27500,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "and that turned out harder than expected"
+    }
+   ]
+  },
+  {
+   "tStartMs": 30000,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "because the tolerances were completely off"
+    }
+   ]
+  },
+  {
+   "tStartMs": 32500,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "so I redid the mounting bracket from scratch"
+    }
+   ]
+  },
+  {
+   "tStartMs": 35000,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "the next step was to measure the frame again 1"
+    }
+   ]
+  },
+  {
+   "tStartMs": 37500,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "and that turned out harder than expected"
+    }
+   ]
+  },
+  {
+   "tStartMs": 40000,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "because the tolerances were completely off"
+    }
+   ]
+  },
+  {
+   "tStartMs": 42500,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "so I redid the mounting bracket from scratch"
+    }
+   ]
+  },
+  {
+   "tStartMs": 45000,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "the next step was to measure the frame again 2"
+    }
+   ]
+  },
+  {
+   "tStartMs": 47500,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "and that turned out harder than expected"
+    }
+   ]
+  },
+  {
+   "tStartMs": 50000,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "because the tolerances were completely off"
+    }
+   ]
+  },
+  {
+   "tStartMs": 52500,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "so I redid the mounting bracket from scratch"
+    }
+   ]
+  },
+  {
+   "tStartMs": 55000,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "the next step was to measure the frame again 3"
+    }
+   ]
+  },
+  {
+   "tStartMs": 57500,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "and that turned out harder than expected"
+    }
+   ]
+  },
+  {
+   "tStartMs": 60000,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "because the tolerances were completely off"
+    }
+   ]
+  },
+  {
+   "tStartMs": 62500,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "so I redid the mounting bracket from scratch"
+    }
+   ]
+  },
+  {
+   "tStartMs": 65000,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "the next step was to measure the frame again 4"
+    }
+   ]
+  },
+  {
+   "tStartMs": 67500,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "and that turned out harder than expected"
+    }
+   ]
+  },
+  {
+   "tStartMs": 70000,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "because the tolerances were completely off"
+    }
+   ]
+  },
+  {
+   "tStartMs": 72500,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "so I redid the mounting bracket from scratch"
+    }
+   ]
+  },
+  {
+   "tStartMs": 75000,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "the next step was to measure the frame again 5"
+    }
+   ]
+  },
+  {
+   "tStartMs": 77500,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "and that turned out harder than expected"
+    }
+   ]
+  },
+  {
+   "tStartMs": 80000,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "because the tolerances were completely off"
+    }
+   ]
+  },
+  {
+   "tStartMs": 82500,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "so I redid the mounting bracket from scratch"
+    }
+   ]
+  },
+  {
+   "tStartMs": 85000,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "the next step was to measure the frame again 6"
+    }
+   ]
+  },
+  {
+   "tStartMs": 87500,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "and that turned out harder than expected"
+    }
+   ]
+  },
+  {
+   "tStartMs": 90000,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "because the tolerances were completely off"
+    }
+   ]
+  },
+  {
+   "tStartMs": 92500,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "so I redid the mounting bracket from scratch"
+    }
+   ]
+  },
+  {
+   "tStartMs": 95000,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "the next step was to measure the frame again 7"
+    }
+   ]
+  },
+  {
+   "tStartMs": 97500,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "and that turned out harder than expected"
+    }
+   ]
+  },
+  {
+   "tStartMs": 100000,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "because the tolerances were completely off"
+    }
+   ]
+  },
+  {
+   "tStartMs": 102500,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "so I redid the mounting bracket from scratch"
+    }
+   ]
+  },
+  {
+   "tStartMs": 105000,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "the next step was to measure the frame again 8"
+    }
+   ]
+  },
+  {
+   "tStartMs": 107500,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "and that turned out harder than expected"
+    }
+   ]
+  },
+  {
+   "tStartMs": 110000,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "because the tolerances were completely off"
+    }
+   ]
+  },
+  {
+   "tStartMs": 112500,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "so I redid the mounting bracket from scratch"
+    }
+   ]
+  },
+  {
+   "tStartMs": 115000,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "the next step was to measure the frame again 9"
+    }
+   ]
+  },
+  {
+   "tStartMs": 117500,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "and that turned out harder than expected"
+    }
+   ]
+  },
+  {
+   "tStartMs": 120000,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "because the tolerances were completely off"
+    }
+   ]
+  },
+  {
+   "tStartMs": 122500,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "so I redid the mounting bracket from scratch"
+    }
+   ]
+  },
+  {
+   "tStartMs": 125000,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "the next step was to measure the frame again 10"
+    }
+   ]
+  },
+  {
+   "tStartMs": 127500,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "and that turned out harder than expected"
+    }
+   ]
+  },
+  {
+   "tStartMs": 130000,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "because the tolerances were completely off"
+    }
+   ]
+  },
+  {
+   "tStartMs": 132500,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "so I redid the mounting bracket from scratch"
+    }
+   ]
+  },
+  {
+   "tStartMs": 135000,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "the next step was to measure the frame again 11"
+    }
+   ]
+  },
+  {
+   "tStartMs": 137500,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "and that turned out harder than expected"
+    }
+   ]
+  },
+  {
+   "tStartMs": 140000,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "because the tolerances were completely off"
+    }
+   ]
+  },
+  {
+   "tStartMs": 142500,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "so I redid the mounting bracket from scratch"
+    }
+   ]
+  },
+  {
+   "tStartMs": 145000,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "the next step was to measure the frame again 12"
+    }
+   ]
+  },
+  {
+   "tStartMs": 147500,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "and that turned out harder than expected"
+    }
+   ]
+  },
+  {
+   "tStartMs": 150000,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "because the tolerances were completely off"
+    }
+   ]
+  },
+  {
+   "tStartMs": 152500,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "so I redid the mounting bracket from scratch"
+    }
+   ]
+  },
+  {
+   "tStartMs": 155000,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "the next step was to measure the frame again 13"
+    }
+   ]
+  },
+  {
+   "tStartMs": 157500,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "and that turned out harder than expected"
+    }
+   ]
+  },
+  {
+   "tStartMs": 160000,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "because the tolerances were completely off"
+    }
+   ]
+  },
+  {
+   "tStartMs": 162500,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "so I redid the mounting bracket from scratch"
+    }
+   ]
+  },
+  {
+   "tStartMs": 165000,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "the next step was to measure the frame again 14"
+    }
+   ]
+  },
+  {
+   "tStartMs": 167500,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "and that turned out harder than expected"
+    }
+   ]
+  },
+  {
+   "tStartMs": 170000,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "because the tolerances were completely off"
+    }
+   ]
+  },
+  {
+   "tStartMs": 172500,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "so I redid the mounting bracket from scratch"
+    }
+   ]
+  },
+  {
+   "tStartMs": 175000,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "the next step was to measure the frame again 15"
+    }
+   ]
+  },
+  {
+   "tStartMs": 177500,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "and that turned out harder than expected"
+    }
+   ]
+  },
+  {
+   "tStartMs": 180000,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "because the tolerances were completely off"
+    }
+   ]
+  },
+  {
+   "tStartMs": 182500,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "so I redid the mounting bracket from scratch"
+    }
+   ]
+  },
+  {
+   "tStartMs": 185000,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "the next step was to measure the frame again 16"
+    }
+   ]
+  },
+  {
+   "tStartMs": 187500,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "and that turned out harder than expected"
+    }
+   ]
+  },
+  {
+   "tStartMs": 190000,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "because the tolerances were completely off"
+    }
+   ]
+  },
+  {
+   "tStartMs": 192500,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "so I redid the mounting bracket from scratch"
+    }
+   ]
+  },
+  {
+   "tStartMs": 195000,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "the next step was to measure the frame again 17"
+    }
+   ]
+  },
+  {
+   "tStartMs": 197500,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "and that turned out harder than expected"
+    }
+   ]
+  },
+  {
+   "tStartMs": 200000,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "because the tolerances were completely off"
+    }
+   ]
+  },
+  {
+   "tStartMs": 202500,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "so I redid the mounting bracket from scratch"
+    }
+   ]
+  },
+  {
+   "tStartMs": 205000,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "the next step was to measure the frame again 18"
+    }
+   ]
+  },
+  {
+   "tStartMs": 207500,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "and that turned out harder than expected"
+    }
+   ]
+  },
+  {
+   "tStartMs": 210000,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "because the tolerances were completely off"
+    }
+   ]
+  },
+  {
+   "tStartMs": 212500,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "so I redid the mounting bracket from scratch"
+    }
+   ]
+  },
+  {
+   "tStartMs": 215000,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "the next step was to measure the frame again 19"
+    }
+   ]
+  },
+  {
+   "tStartMs": 217500,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "and that turned out harder than expected"
+    }
+   ]
+  },
+  {
+   "tStartMs": 220000,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "because the tolerances were completely off"
+    }
+   ]
+  },
+  {
+   "tStartMs": 222500,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "so I redid the mounting bracket from scratch"
+    }
+   ]
+  },
+  {
+   "tStartMs": 225000,
+   "dDurationMs": 2500,
+   "segs": [
+    {
+     "utf8": "so I redid the mounting bracket from scratch"
+    }
+   ]
+  }
+ ]
+}

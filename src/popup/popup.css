@@ -67,3 +67,19 @@ input[type="checkbox"] { accent-color: var(--accent); width: 15px; height: 15px;
 .switch input:checked + .slider { background: var(--accent); }
 .switch input:checked + .slider::before { transform: translateX(17px); }
 footer { padding: 0 14px; min-height: 16px; font-size: 11px; color: var(--muted); text-align: right; }
+
+.sub { margin: 6px 0 0 6px; padding-left: 10px; border-left: 2px solid var(--line); }
+.sub[hidden] { display: none; }
+.note { margin: 4px 0 8px; font-size: 11px; color: var(--muted); line-height: 1.4; }
+.note code { background: #262626; padding: 1px 4px; border-radius: 4px; }
+.warn { margin: 4px 0 8px; font-size: 11px; line-height: 1.4; color: #ffcc66; }
+.cats { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 8px; margin: 6px 0 10px; }
+.cats label { display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer; }
+select, input[type="text"], input[type="password"] {
+  background: var(--panel); color: var(--fg); border: 1px solid var(--line);
+  border-radius: 6px; padding: 5px 7px; font: inherit; font-size: 12px; width: 150px;
+}
+.row.num select { width: 150px; }
+#test-result:empty { display: none; }
+#test-result.ok { color: #7ddc7d; }
+#test-result.bad { color: #ff8a8a; }

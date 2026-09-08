@@ -20,7 +20,7 @@
   if (globalThis.__autoskipMainLoaded) return;
   globalThis.__autoskipMainLoaded = true;
 
-  var VERSION = '0.2.0';
+  var VERSION = '0.3.0';
   var TAG = '__autoskip';
   var PREFIX = '[autoskip]';
 
@@ -63,6 +63,11 @@
         videoId: videoId,
         ranges: [],
         segments: [],
+        jumpSegments: [],
+        sponsorSegments: [],
+        transcriptLines: [],
+        transcriptPath: null,
+        lastJump: null,
         rejected: [],
         titles: [],
         consumed: new Set(),
@@ -107,14 +112,28 @@
       log('settings updated', settings);
     } else if (d.type === 'blocked') {
       blocked = !!d.blocked;
+    } else if (d.type === 'sponsor-segments') {
+      if (d.videoId) applySponsorSegments(d.videoId, d.segments, d.meta);
+    } else if (d.type === 'transcript-request') {
+      var tst = videos.get(d.videoId);
+      post('transcript-response', {
+        videoId: d.videoId,
+        lines: tst ? tst.transcriptLines : [],
+        path: tst ? tst.transcriptPath : null
+      });
+    } else if (d.type === 'undo-jump') {
+      undoJump(d.videoId, d.rangeId);
+    } else if (d.type === 'selftest-result') {
+      renderSelfTest(d.results);
     } else if (d.type === 'chip-sighting') {
       // The DOM layer saw a real Jump Ahead chip. If we have no data for this
       // video, our extraction missed something — say so loudly, because this
       // is the single most useful signal for diagnosing a payload change.
       var st = videos.get(currentVideoId());
       if (!st || !st.ranges.length) {
-        warn('chip sighting with NO extracted segments — the payload shape may have ' +
-          'changed. Run __autoskip.report() and check rejected entries.');
+        warn('[W-CHIP-NO-DATA] a Jump Ahead chip is on screen but nothing was ' +
+          'extracted for this video — the payload shape may have changed. ' +
+          'Run __autoskip.report() and check rejected entries.');
       }
     }
   });
@@ -130,7 +149,7 @@
     try {
       segments = M.extractAllSegments(payload, rejected);
     } catch (e) {
-      warn('extraction failed from ' + source, e);
+      warn('[W-PARSE] extraction failed from ' + source, e);
       return null;
     }
 
@@ -148,10 +167,11 @@
       return st;
     }
 
+    st.jumpSegments = segments;
     st.segments = segments;
-    st.ranges = M.buildRanges(segments);
     st.titles = segments.map(function (s) { return s.label; }).filter(Boolean);
     st.announced = true;
+    recomputeRanges(st);
 
     log('captured', st.ranges.length, 'jump range(s) from', source, 'for', videoId);
     st.ranges.forEach(function (r) {
@@ -172,6 +192,69 @@
     });
   }
 
+  /**
+   * Jump Ahead ranges and sponsor ranges live in one list. buildRanges() sorts
+   * and clips them against each other, so an ad read that overlaps a jump-ahead
+   * window can't produce two fighting seeks.
+   */
+  function recomputeRanges(st) {
+    var all = (st.jumpSegments || []).concat(st.sponsorSegments || []);
+    st.ranges = M.buildRanges(all);
+    return st.ranges;
+  }
+
+  function applySponsorSegments(videoId, segments, meta) {
+    var st = stateFor(videoId);
+    var video = getVideo();
+
+    // A late result must never seek backwards over content already watched.
+    var currentMs = video && currentVideoId() === videoId ? video.currentTime * 1000 : 0;
+    var usable = globalThis.ASSegments
+      ? globalThis.ASSegments.dropPassed(segments || [], currentMs)
+      : (segments || []);
+
+    st.sponsorSegments = usable;
+    st.sponsorMeta = meta || null;
+    recomputeRanges(st);
+
+    log('sponsor segments applied:', usable.length, 'of', (segments || []).length,
+      'still ahead of the playhead', meta || '');
+    usable.forEach(function (sg) {
+      log('  ' + fmt(sg.triggerMs) + ' → ' + fmt(sg.seekTargetMs) + '  ' + sg.label + ' [' + sg.source + ']');
+    });
+  }
+
+  // ─────────────────────────────────────────────────── transcript capture
+
+  var T = globalThis.ASTranscript;
+
+  function videoIdFromUrl(url) {
+    try {
+      var m = String(url).match(/[?&]v=([A-Za-z0-9_-]{11})/);
+      return m ? m[1] : null;
+    } catch (e) { return null; }
+  }
+
+  function ingestTranscript(json, kind, url) {
+    if (!T) return;
+    var lines;
+    try {
+      lines = kind === 'timedtext' ? T.fromTimedText(json) : T.fromGetTranscript(json);
+    } catch (e) { return; }
+    if (!lines.length) return;
+
+    var videoId = videoIdFromUrl(url) || currentVideoId();
+    if (!videoId) return;
+
+    var st = stateFor(videoId);
+    // Prefer the richer capture if we already have one.
+    if (st.transcriptLines.length >= lines.length) return;
+    st.transcriptLines = lines;
+    st.transcriptPath = kind;
+    log('transcript captured via', kind, '-', lines.length, 'lines for', videoId);
+    post('transcript-ready', { videoId: videoId, lineCount: lines.length, path: kind });
+  }
+
   // ──────────────────────────────────────────── network / global capture
 
   /**
@@ -183,18 +266,32 @@
    */
   var INTERESTING = /\/youtubei\/v1\/(player|next|get_watch|reel_watch_sequence)(\?|$)/;
 
+  /**
+   * Transcript sources. /api/timedtext is fetched by YouTube itself to render
+   * captions, so catching it costs nothing and disturbs no UI; get_transcript
+   * fires when the transcript panel opens. Both carry exact millisecond
+   * timings, unlike scraping the panel's rendered "1:23" labels.
+   */
+  var TRANSCRIPT_RE = /\/(api\/timedtext|youtubei\/v1\/get_transcript)(\?|$)/;
+
+  function transcriptKind(url) {
+    return /api\/timedtext/.test(url) ? 'timedtext' : 'get_transcript';
+  }
+
   var nativeFetch = window.fetch;
   if (typeof nativeFetch === 'function') {
     window.fetch = function (input) {
       var url = '';
       try { url = typeof input === 'string' ? input : (input && input.url) || ''; } catch (e) {}
       var p = nativeFetch.apply(this, arguments);
-      if (url && INTERESTING.test(url)) {
+      if (url && (INTERESTING.test(url) || TRANSCRIPT_RE.test(url))) {
+        var isTranscript = TRANSCRIPT_RE.test(url);
         p.then(function (res) {
           try {
-            res.clone().json()
-              .then(function (j) { ingest(j, 'fetch ' + url.split('?')[0].split('/').pop()); })
-              .catch(function () {});
+            res.clone().json().then(function (j) {
+              if (isTranscript) ingestTranscript(j, transcriptKind(url), url);
+              else ingest(j, 'fetch ' + url.split('?')[0].split('/').pop());
+            }).catch(function () { /* timedtext can be XML; ignore */ });
           } catch (e) {}
           return res;
         }).catch(function () {});
@@ -212,7 +309,7 @@
   XMLHttpRequest.prototype.send = function () {
     var self = this;
     try {
-      if (self.__autoskipUrl && INTERESTING.test(self.__autoskipUrl)) {
+      if (self.__autoskipUrl && (INTERESTING.test(self.__autoskipUrl) || TRANSCRIPT_RE.test(self.__autoskipUrl))) {
         self.addEventListener('load', function () {
           try {
             var body = null;
@@ -221,7 +318,13 @@
             else if (self.responseType === '' || self.responseType === 'text') {
               body = self.responseText ? JSON.parse(self.responseText) : null;
             }
-            if (body) ingest(body, 'xhr ' + String(self.__autoskipUrl).split('?')[0].split('/').pop());
+            if (body) {
+              if (TRANSCRIPT_RE.test(self.__autoskipUrl)) {
+                ingestTranscript(body, transcriptKind(self.__autoskipUrl), self.__autoskipUrl);
+              } else {
+                ingest(body, 'xhr ' + String(self.__autoskipUrl).split('?')[0].split('/').pop());
+              }
+            }
           } catch (e) {}
         });
       }
@@ -243,7 +346,9 @@
         set: function (v) { stored = v; try { ingest(v, 'window.' + prop); } catch (e) {} }
       });
     } catch (e) {
-      warn('could not trap window.' + prop + ' (script ran late?)');
+      warn('[W-TRAP] could not trap window.' + prop + '. The MAIN script did not ' +
+        'run at document_start, so inline data for the first video was missed. ' +
+        'Later videos still work via network capture.');
     }
     if (stored) { try { ingest(stored, 'window.' + prop + ' (already set)'); } catch (e) {} }
   });
@@ -309,14 +414,56 @@
       if (player && typeof player.seekTo === 'function') player.seekTo(targetSec, true);
       else video.currentTime = targetSec;
     } catch (e) {
-      warn('seek failed', e);
+      warn('[W-SEEK] seek failed', e);
       return;
     }
 
-    console.log(PREFIX + ' jumped ' + fmt(from) + ' → ' + fmt(decision.targetMillis) +
-      '  (saved ' + Math.round(decision.savedMillis / 1000) + 's)');
+    st.lastJump = {
+      rangeId: decision.range.id,
+      fromMs: from,
+      toMs: decision.targetMillis,
+      label: decision.range.title,
+      source: decision.range.source
+    };
 
-    post('jump', { videoId: st.videoId, millisSaved: decision.savedMillis, source: decision.range.source });
+    console.log(PREFIX + ' jumped ' + fmt(from) + ' → ' + fmt(decision.targetMillis) +
+      '  (' + (decision.range.title || 'segment') + ', saved ' +
+      Math.round(decision.savedMillis / 1000) + 's)');
+
+    post('jump', {
+      videoId: st.videoId,
+      millisSaved: decision.savedMillis,
+      source: decision.range.source,
+      rangeId: decision.range.id,
+      label: decision.range.title || null
+    });
+  }
+
+  /**
+   * Put the playhead back where it was before a skip. The range stays consumed
+   * so it will not immediately fire again and bounce the user forward.
+   */
+  function undoJump(videoId, rangeId) {
+    var st = videos.get(videoId || currentVideoId());
+    if (!st || !st.lastJump) return;
+    if (rangeId && st.lastJump.rangeId !== rangeId) return;
+
+    var video = getVideo();
+    var player = getPlayer();
+    if (!video) return;
+
+    var backToSec = st.lastJump.fromMs / 1000;
+    selfSeekAt = Date.now();
+    try {
+      if (player && typeof player.seekTo === 'function') player.seekTo(backToSec, true);
+      else video.currentTime = backToSec;
+    } catch (e) { warn('[W-UNDO] undo seek failed', e); return; }
+
+    st.consumed.add(st.lastJump.rangeId);
+    st.jumps = Math.max(0, st.jumps - 1);
+    console.log(PREFIX + ' undid the skip — back to ' + fmt(st.lastJump.fromMs));
+    post('undo-done', { videoId: st.videoId, millisSaved: -(st.lastJump.toMs - st.lastJump.fromMs) });
+    st.lastJump = null;
   }
 
   function onSeeking(video) {
@@ -360,6 +507,31 @@
       }, 0);
     });
   });
+
+  // ───────────────────────────────────────────────────────── self-test
+
+  var SELFTEST_LABELS = {
+    adSkip: 'ad "Skip" button is clicked',
+    skipIntroChip: '"Skip intro" chip is clicked',
+    shoppingBadgeIgnored: 'shopping badge is NOT clicked  (guard)',
+    continueWatching: '"Continue watching?" is confirmed',
+    confirmGuardHolds: 'dialog after user input is NOT confirmed  (guard)'
+  };
+
+  function renderSelfTest(results) {
+    var pass = 0, fail = 0;
+    console.log(PREFIX + ' ── self-test ─────────────────────────────');
+    Object.keys(results).forEach(function (k) {
+      var r = results[k];
+      if (r.pass) pass++; else fail++;
+      console.log('  ' + (r.pass ? 'PASS' : 'FAIL') + '  ' + (SELFTEST_LABELS[k] || k) +
+        (r.note ? '\n        ' + r.note : '') +
+        (r.clicked !== undefined ? '\n        clicked=' + r.clicked + ' after ' + r.ms + 'ms' : '') +
+        (r.note && r.note.indexOf('no ') === 0 ? '' : ''));
+    });
+    console.log('  ' + pass + ' passed, ' + fail + ' failed');
+    console.log(PREFIX + ' ──────────────────────────────────────────');
+  }
 
   // ─────────────────────────────────────────────── diagnostic surface
 
@@ -423,6 +595,56 @@
       return st ? st.ranges : null;
     },
 
+    /**
+     * Exercise the ad-skip, chip and dialog paths by synthesising the DOM
+     * YouTube would produce. Needed because on Premium there are no ads, and
+     * the idle dialog takes ~30 minutes to appear on its own.
+     *
+     * Briefly inserts throwaway elements into the player and pauses/resumes
+     * playback, then cleans up after itself.
+     */
+    selftest: function (only) {
+      console.log(PREFIX + ' running self-test (~12s, the video will pause and resume)...');
+      post('selftest-run', { only: only || null });
+    },
+
+    /** What transcript we hold for this video, and which path produced it. */
+    transcript: function () {
+      var st = videos.get(currentVideoId());
+      if (!st || !st.transcriptLines.length) {
+        console.log(PREFIX + ' no transcript captured yet. It arrives when YouTube ' +
+          'fetches captions, or when the transcript panel is opened.');
+        return { lines: 0, path: null };
+      }
+      console.log(PREFIX + ' transcript: ' + st.transcriptLines.length + ' lines via ' + st.transcriptPath);
+      console.log('  first:', st.transcriptLines[0]);
+      console.log('  last :', st.transcriptLines[st.transcriptLines.length - 1]);
+      return { lines: st.transcriptLines.length, path: st.transcriptPath, sample: st.transcriptLines.slice(0, 5) };
+    },
+
+    /** Inject a synthetic sponsor segment to exercise the skip + toast + undo. */
+    simulateSponsor: function (inSeconds, lengthSeconds) {
+      inSeconds = typeof inSeconds === 'number' ? inSeconds : 5;
+      lengthSeconds = typeof lengthSeconds === 'number' ? lengthSeconds : 30;
+      var video = getVideo();
+      var id = currentVideoId();
+      if (!video || !id) { console.warn(PREFIX + ' simulateSponsor: not on a watch page'); return null; }
+
+      var startMs = Math.round(video.currentTime * 1000) + inSeconds * 1000;
+      applySponsorSegments(id, [{
+        triggerMs: startMs,
+        seekTargetMs: startMs + lengthSeconds * 1000,
+        label: 'Sponsor (simulated)',
+        category: 'sponsor',
+        source: 'simulated'
+      }], { source: 'simulated' });
+
+      console.log(PREFIX + ' simulated a sponsor segment at ' + fmt(startMs) + ' → ' +
+        fmt(startMs + lengthSeconds * 1000) + '; it should skip in ~' + inSeconds + 's.');
+      var st = videos.get(id);
+      return st ? st.ranges : null;
+    },
+
     reset: function () {
       var id = currentVideoId();
       videos.delete(id);
@@ -443,6 +665,12 @@
       console.log('  rejected       ', (s.rejected || []).length);
       (s.rejected || []).forEach(function (r) { console.log('     ', r); });
       console.log('  jumps made     ', s.jumps, s.suspended ? '(SUSPENDED — you undid one)' : '');
+      var st = videos.get(s.videoId);
+      console.log('  transcript     ', st && st.transcriptLines.length
+        ? st.transcriptLines.length + ' lines via ' + st.transcriptPath
+        : 'none captured');
+      console.log('  sponsor segs   ', st && st.sponsorSegments ? st.sponsorSegments.length : 0,
+        st && st.sponsorMeta ? JSON.stringify(st.sponsorMeta).slice(0, 160) : '');
       console.log('  settings       ', this.settings());
       var chip = document.querySelector('.ytp-jump-ahead-button');
       console.log('  chip in DOM    ', chip ? 'YES ' + JSON.stringify(chip.getBoundingClientRect().width + 'x' + chip.getBoundingClientRect().height) : 'no');
@@ -451,6 +679,8 @@
     }
   };
 
-  log('MAIN world ready (v' + VERSION + ') — try __autoskip.report()');
+  // Always logged, not gated on debug: the first thing to establish when
+  // diagnosing anything is which build is actually loaded.
+  console.log(PREFIX + ' v' + VERSION + ' ready — __autoskip.report()');
   post('ready', {});
 })();

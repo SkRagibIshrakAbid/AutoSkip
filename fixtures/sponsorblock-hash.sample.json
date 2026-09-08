@@ -1,0 +1,56 @@
+[
+  {
+    "videoID": "TZdUz0YRJ3g",
+    "segments": [
+      {
+        "category": "sponsor",
+        "actionType": "skip",
+        "segment": [
+          0,
+          60.4
+        ],
+        "UUID": "b926e4124e80921e4d55776467c7009c827e38d0b1cff108ffd68ca2e57a05507",
+        "videoDuration": 785.484,
+        "locked": 0,
+        "votes": 0,
+        "description": ""
+      }
+    ]
+  },
+  {
+    "videoID": "Ggm2gOTZFMg",
+    "segments": [
+      {
+        "category": "sponsor",
+        "actionType": "skip",
+        "segment": [
+          0,
+          40.5
+        ],
+        "UUID": "28c2fab2f4fe1979f0e8ae471bd43bb86a2c2020631f2d1defb68d1a79f7c0527",
+        "videoDuration": 476.981,
+        "locked": 0,
+        "votes": 0,
+        "description": ""
+      }
+    ]
+  },
+  {
+    "videoID": "Z4071IYhEDU",
+    "segments": [
+      {
+        "category": "sponsor",
+        "actionType": "skip",
+        "segment": [
+          0,
+          28.466
+        ],
+        "UUID": "f1e5dc8e156ae95a8111839edf41a7c9261ef98666d55175c97abf329f36f7e86",
+        "videoDuration": 434.561,
+        "locked": 0,
+        "votes": 0,
+        "description": ""
+      }
+    ]
+  }
+]

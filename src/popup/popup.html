@@ -18,7 +18,7 @@
     <div><strong id="stat-jumps">0</strong><span>jumps</span></div>
     <div><strong id="stat-saved">0m</strong><span>skipped</span></div>
     <div><strong id="stat-ads">0</strong><span>ads</span></div>
-    <div><strong id="stat-dialogs">0</strong><span>dialogs</span></div>
+    <div><strong id="stat-sponsor">0</strong><span>sponsors</span></div>
   </section>
 
   <section>
@@ -27,6 +27,51 @@
     <label class="row"><input type="checkbox" id="adSkip"> Ad “Skip” button</label>
     <label class="row"><input type="checkbox" id="continueWatching"> “Continue watching?” dialog</label>
     <label class="row"><input type="checkbox" id="suggestedChips"> “Skip intro” chips</label>
+  </section>
+
+  <section>
+    <h2>Sponsor skip <span class="muted">non-Premium ad reads</span></h2>
+    <label class="row"><input type="checkbox" id="sponsorSkip"> Skip sponsor segments</label>
+
+    <div class="sub" id="sponsor-body">
+      <label class="row"><input type="checkbox" id="sbEnabled"> SponsorBlock <em>(free, no setup)</em></label>
+      <p class="note">Looks up a 4-character hash of the video id, so the server never
+        learns which video you are watching.</p>
+
+      <div class="cats">
+        <label><input type="checkbox" data-cat="sponsor"> Sponsor</label>
+        <label><input type="checkbox" data-cat="selfpromo"> Self-promo</label>
+        <label><input type="checkbox" data-cat="interaction"> Like/sub asides</label>
+        <label><input type="checkbox" data-cat="intro"> Intro</label>
+        <label><input type="checkbox" data-cat="outro"> Outro</label>
+      </div>
+
+      <label class="row"><input type="checkbox" id="llmEnabled"> Use an LLM when SponsorBlock has nothing</label>
+
+      <div class="sub" id="llm-body">
+        <p class="warn" id="privacy-note"></p>
+        <label class="row num">Provider
+          <select id="llmProvider">
+            <option value="ollama">Ollama (local)</option>
+            <option value="openai">OpenAI-compatible</option>
+            <option value="anthropic">Anthropic (Claude)</option>
+            <option value="gemini">Google Gemini</option>
+          </select>
+        </label>
+        <label class="row num">Base URL <input type="text" id="llmBaseUrl" placeholder="default"></label>
+        <label class="row num">Model <input type="text" id="llmModel" placeholder="default"></label>
+        <label class="row num" id="key-row">API key <input type="password" id="llmApiKey" placeholder="stored locally"></label>
+        <p class="note" id="ollama-note" hidden>Ollama must allow this extension:
+          set <code>OLLAMA_ORIGINS=*</code> and restart it.</p>
+        <button id="test-provider" class="btn">Test connection</button>
+        <p class="note" id="test-result"></p>
+        <label class="row num">Min confidence <input type="number" id="minConfidence" min="0" max="1" step="0.05"></label>
+        <label class="row num">Skip videos under (s) <input type="number" id="minVideoSeconds" min="0" max="3600" step="30"></label>
+      </div>
+
+      <label class="row"><input type="checkbox" id="showToast"> Show a toast with Undo</label>
+      <button id="clear-cache" class="btn subtle">Clear segment cache</button>
+    </div>
   </section>
 
   <section>

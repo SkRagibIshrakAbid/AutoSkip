@@ -4,9 +4,24 @@ var D = globalThis.ASDefaults;
 
 var BOOLS = [
   'enabled', 'jumpAhead', 'adSkip', 'continueWatching', 'suggestedChips',
-  'tier2Fallback', 'debug', 'captureMode', 'forceTier2'
+  'tier2Fallback', 'debug', 'captureMode', 'forceTier2',
+  'sponsorSkip', 'sbEnabled', 'llmEnabled', 'showToast'
 ];
-var NUMS = ['maxJumpsPerVideo', 'cooldownMs'];
+var NUMS = ['maxJumpsPerVideo', 'cooldownMs', 'minConfidence', 'minVideoSeconds'];
+var TEXTS = ['llmBaseUrl', 'llmModel'];
+var SELECTS = ['llmProvider'];
+
+// Provider hints shown in the popup. Kept in sync with providers/llm.js.
+var PROVIDER_INFO = {
+  ollama: { needsKey: false, base: 'http://localhost:11434', model: 'llama3.1',
+    privacy: 'Runs on your machine. The transcript never leaves this computer.' },
+  openai: { needsKey: true, base: 'https://api.openai.com/v1', model: 'gpt-4o-mini',
+    privacy: 'Video transcripts will be sent to this endpoint.' },
+  anthropic: { needsKey: true, base: 'https://api.anthropic.com', model: 'claude-sonnet-5',
+    privacy: 'Video transcripts will be sent to Anthropic.' },
+  gemini: { needsKey: true, base: 'https://generativelanguage.googleapis.com', model: 'gemini-2.0-flash',
+    privacy: 'Video transcripts will be sent to Google.' }
+};
 
 var settings = D.withDefaults(null);
 var currentVideoId = null;
@@ -23,8 +38,28 @@ function hint(text) {
 function render() {
   BOOLS.forEach(function (k) { $(k).checked = !!settings[k]; });
   NUMS.forEach(function (k) { $(k).value = settings[k]; });
+  TEXTS.concat(SELECTS).forEach(function (k) { $(k).value = settings[k] || ''; });
   $('blocklist').value = (settings.blocklist || []).join('\n');
+
+  var cats = settings.segCategories || [];
+  document.querySelectorAll('[data-cat]').forEach(function (el) {
+    el.checked = cats.indexOf(el.getAttribute('data-cat')) !== -1;
+  });
+
   updateBlockButton();
+  updateSponsorUi();
+}
+
+function updateSponsorUi() {
+  $('sponsor-body').hidden = !settings.sponsorSkip;
+  $('llm-body').hidden = !settings.llmEnabled;
+
+  var info = PROVIDER_INFO[settings.llmProvider] || PROVIDER_INFO.ollama;
+  $('llmBaseUrl').placeholder = info.base;
+  $('llmModel').placeholder = info.model;
+  $('key-row').hidden = !info.needsKey;
+  $('ollama-note').hidden = settings.llmProvider !== 'ollama';
+  $('privacy-note').textContent = info.privacy;
 }
 
 function save(patch) {
@@ -39,7 +74,7 @@ function renderStats(stats) {
   var s = Object.assign({}, D.STATS, stats || {});
   $('stat-jumps').textContent = s.jumps;
   $('stat-ads').textContent = s.adsSkipped;
-  $('stat-dialogs').textContent = s.dialogsDismissed;
+  $('stat-sponsor').textContent = s.sponsorSkips || 0;
 
   var mins = Math.round((s.millisSaved || 0) / 60000);
   $('stat-saved').textContent = mins >= 60
@@ -68,16 +103,77 @@ BOOLS.forEach(function (k) {
     var patch = {};
     patch[k] = $(k).checked;
     save(patch);
+    if (k === 'sponsorSkip' || k === 'llmEnabled') updateSponsorUi();
   });
 });
 
 NUMS.forEach(function (k) {
   $(k).addEventListener('change', function () {
-    var n = parseInt($(k).value, 10);
+    var n = k === 'minConfidence' ? parseFloat($(k).value) : parseInt($(k).value, 10);
     if (!Number.isFinite(n)) { $(k).value = settings[k]; return; }
     var patch = {};
-    patch[k] = Math.max(0, n);
+    patch[k] = k === 'minConfidence' ? Math.min(1, Math.max(0, n)) : Math.max(0, n);
     save(patch);
+  });
+});
+
+TEXTS.forEach(function (k) {
+  $(k).addEventListener('change', function () {
+    var patch = {};
+    patch[k] = $(k).value.trim();
+    save(patch);
+  });
+});
+
+SELECTS.forEach(function (k) {
+  $(k).addEventListener('change', function () {
+    var patch = {};
+    patch[k] = $(k).value;
+    save(patch);
+    updateSponsorUi();
+  });
+});
+
+document.querySelectorAll('[data-cat]').forEach(function (el) {
+  el.addEventListener('change', function () {
+    var cats = [];
+    document.querySelectorAll('[data-cat]').forEach(function (e) {
+      if (e.checked) cats.push(e.getAttribute('data-cat'));
+    });
+    save({ segCategories: cats });
+  });
+});
+
+/**
+ * The API key is written to its OWN storage key, never into `settings` —
+ * `settings` is broadcast into the page's JS world, which YouTube's own
+ * scripts share.
+ */
+$('llmApiKey').addEventListener('change', function () {
+  var payload = {};
+  payload[D.SECRETS_KEY] = { llmApiKey: $('llmApiKey').value };
+  chrome.storage.local.set(payload, function () { hint('Key saved'); });
+});
+
+$('test-provider').addEventListener('click', function () {
+  var out = $('test-result');
+  out.className = '';
+  out.textContent = 'Testing...';
+  chrome.runtime.sendMessage({ type: 'testProvider' }, function (r) {
+    if (!r) { out.className = 'bad'; out.textContent = 'No response from the extension worker.'; return; }
+    if (r.ok) {
+      out.className = 'ok';
+      out.textContent = 'Works — ' + r.model + (r.gotJson ? ' returned valid JSON.' : ' replied, but not JSON.');
+    } else {
+      out.className = 'bad';
+      out.textContent = r.error;
+    }
+  });
+});
+
+$('clear-cache').addEventListener('click', function () {
+  chrome.runtime.sendMessage({ type: 'clearSegmentCache' }, function (r) {
+    hint(r ? 'Cleared ' + r.cleared : 'Cleared');
   });
 });
 
@@ -111,10 +207,12 @@ $('reset-stats').addEventListener('click', function () {
 
 // ---------------------------------------------------------------- bootstrap
 
-chrome.storage.local.get([D.STORAGE_KEY, D.STATS_KEY], function (res) {
+chrome.storage.local.get([D.STORAGE_KEY, D.STATS_KEY, D.SECRETS_KEY], function (res) {
   settings = D.withDefaults(res && res[D.STORAGE_KEY]);
   render();
   renderStats(res && res[D.STATS_KEY]);
+  var secrets = D.withSecretDefaults(res && res[D.SECRETS_KEY]);
+  $('llmApiKey').value = secrets.llmApiKey || '';
 });
 
 chrome.storage.onChanged.addListener(function (changes, area) {
