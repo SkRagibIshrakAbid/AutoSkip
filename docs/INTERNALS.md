@@ -130,6 +130,33 @@ trusted regardless of votes. Only `actionType: "skip"` is acted on — `mute`,
 
 ---
 
+## Ads cannot be skipped by clicking
+
+Verified against player `7460dd14`: `.ytp-skip-ad-button` is a real `<button>`,
+but neither `el.click()` nor a full
+`pointerdown → mousedown → pointerup → mouseup → click` sequence does anything.
+Five click attempts across a 15-second ad and it played to the end. YouTube
+evidently requires a trusted event, which an extension cannot forge.
+
+Setting `video.currentTime = video.duration` on the player's media element does
+work, including across ad pods — the element is reused and its `duration` flips
+to the real video's once the break ends.
+
+Two constraints kept deliberately:
+
+- **Only act once the skip button has real layout.** It sits in the DOM at 0×0
+  during the countdown, exactly like the Jump Ahead chip. Acting earlier would
+  cut into an ad the viewer is required to watch, which turns this feature from
+  "press Skip for me" into ad-blocking.
+- **Do not use the `clicked` WeakSet here.** One button element is reused for
+  every ad in a pod, so marking it would disable skipping for the rest of the
+  break.
+
+The self-test drives this path in dry-run, recording the intent rather than
+seeking — otherwise testing would jump the viewer to the end of a real video.
+
+---
+
 ## Execution contexts
 
 Three contexts, and each boundary exists because something can only be done on
@@ -172,7 +199,7 @@ Neither Premium data nor an LLM key is needed to verify the logic.
   the **real** payload shape — decoy command included — through the normal
   capture path.
 - `__autoskip.selftest()` synthesises the DOM YouTube would produce for the ad
-  button, chips and dialogs. Two of its five cases are negative.
+  button, chips and dialogs. Three of its six cases are negative.
 
 One wrinkle if you extend the self-test: `yt-confirm-dialog-renderer` is a live
 custom element, and children appended before it connects get wiped when Polymer

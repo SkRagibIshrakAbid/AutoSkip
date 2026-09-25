@@ -38,7 +38,7 @@ backwards, never re-skip the same segment, always leave a way out.
 |---|---|---|---|
 | ⏭ | **Auto Jump Ahead** — performs Premium's Jump Ahead, chip visible or not | Yes | On |
 | 📺 | **Sponsor skip** — skips in-video ad reads | No | **Off** |
-| ⏩ | **Ad skip** — clicks YouTube's own "Skip" button | No | On |
+| ⏩ | **Ad skip** — skips YouTube ads the moment they become skippable | No | On |
 | 🎬 | **Skip-intro chips** — clicks skip-style suggested-action chips | No | On |
 | ⏸ | **"Continue watching?"** — dismisses the idle prompt | No | On |
 | ↩ | **Undo toast** — every sponsor skip is one tap from reversed | No | On |
@@ -150,15 +150,16 @@ __autoskip.report()          // what was captured, what was rejected, and why
 __autoskip.transcript()      // which transcript path won, and how many lines
 __autoskip.simulate()        // fake a Jump Ahead segment 5s ahead
 __autoskip.simulateSponsor() // fake a sponsor segment → skip + toast + Undo
-__autoskip.selftest()        // exercise ad-skip, chips and dialogs (~12s)
+__autoskip.selftest()        // exercise ad-skip, chips and dialogs (~15s)
 __autoskip.reset()           // clear this video's state
 ```
 
 The simulators feed fake segments through the *real* pipeline, so a successful
 simulated skip proves the whole path works — even on a video that offers nothing
 to skip. `selftest()` builds the DOM YouTube would produce and checks the real
-code clicks it; two of its five cases are negative, confirming a shopping badge
-and a user-opened dialog are correctly left alone.
+code reacts; three of its six cases are negative, confirming that a shopping
+badge, a user-opened dialog and a still-counting-down ad are all correctly left
+alone.
 
 Warnings carry a stable code so they stay identifiable:
 
@@ -203,6 +204,23 @@ changing any of this, are in **[docs/INTERNALS.md](docs/INTERNALS.md)**.
 ---
 
 ## Changelog
+
+### 0.3.1 — Ad skip actually skips
+
+**Fixed**
+- **Ads were never skipped.** YouTube no longer responds to a synthetic click on
+  its skip button — verified live, a full pointer-event sequence is ignored too,
+  and an ad played to the end through five click attempts. Skipping now
+  fast-forwards the ad instead, which works.
+- The skip button is still used as the *signal*: nothing happens until YouTube
+  gives it real size, which is its own way of saying the countdown is over. An
+  ad you're required to watch is still left alone.
+- One button element is reused for every ad in a pod, and the old code marked it
+  as already-clicked — so even had clicking worked, only the first ad in a break
+  would have been skipped.
+
+**Added**
+- A sixth self-test case asserting a still-counting-down ad is not touched.
 
 ### 0.3.0 — Sponsor skip
 

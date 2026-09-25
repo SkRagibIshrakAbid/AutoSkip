@@ -20,7 +20,7 @@
   if (globalThis.__autoskipMainLoaded) return;
   globalThis.__autoskipMainLoaded = true;
 
-  var VERSION = '0.3.0';
+  var VERSION = '0.3.1';
   var TAG = '__autoskip';
   var PREFIX = '[autoskip]';
 
@@ -511,7 +511,8 @@
   // ───────────────────────────────────────────────────────── self-test
 
   var SELFTEST_LABELS = {
-    adSkip: 'ad "Skip" button is clicked',
+    adSkip: 'skippable ad is skipped',
+    adSkipWaitsForCountdown: 'ad still counting down is left alone  (guard)',
     skipIntroChip: '"Skip intro" chip is clicked',
     shoppingBadgeIgnored: 'shopping badge is NOT clicked  (guard)',
     continueWatching: '"Continue watching?" is confirmed',

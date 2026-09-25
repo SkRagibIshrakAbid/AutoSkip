@@ -145,13 +145,63 @@
 
   // ------------------------------------------------------------------- ad skip
 
+  /**
+   * Skip a YouTube ad once YouTube itself says it is skippable.
+   *
+   * Clicking the button does not work any more. Verified live against player
+   * 7460dd14: `.ytp-skip-ad-button` is a real <button>, but a synthetic
+   * `.click()` — and a full pointerdown/mousedown/pointerup/mouseup/click
+   * sequence — are both ignored. Five clicks across a 15s ad and it played to
+   * the end. YouTube evidently requires a trusted event, which an extension
+   * cannot forge.
+   *
+   * So we fast-forward the ad's own media element instead, which produces the
+   * same outcome as pressing Skip. The button is still used as the SIGNAL:
+   * nothing happens until it has real layout, which is YouTube's own way of
+   * saying the countdown is over. That keeps this feature "press Skip for me"
+   * rather than "block ads" — an unskippable ad is left alone.
+   */
   function doAdSkip() {
     if (!shared.settings.adSkip) return;
     var player = document.getElementById('movie_player');
     if (!player || !player.classList.contains('ad-showing')) return;
-    if (!cooled('ad', 700)) return;
-    var btn = firstVisible(AD_SKIP);
-    if (btn && click(btn, 'ad-skip')) shared.bump({ adsSkipped: 1 });
+    if (!cooled('ad', 500)) return;
+
+    // Deliberately NOT firstVisible(): that skips elements already in the
+    // `clicked` set, and the same button element is reused for every ad in a
+    // pod — so one interaction would disable it for the rest of the break.
+    var btn = null;
+    for (var i = 0; i < AD_SKIP.length && !btn; i++) {
+      var found = player.querySelector(AD_SKIP[i]) || document.querySelector(AD_SKIP[i]);
+      if (found) btn = found;
+    }
+    // Present but zero-sized means the countdown is still running.
+    if (!btn || !hasLayout(btn)) return;
+
+    var video = getVideo();
+    if (!video || !Number.isFinite(video.duration) || video.duration <= 0) return;
+    if (video.currentTime >= video.duration - 0.3) return;   // already at the end
+
+    if (selfTest && selfTest.dryRunAdSkip) {
+      // The self-test drives this path with a synthetic button on a REAL video.
+      // Actually seeking would jump the user to the end of what they were
+      // watching, so record the intent instead.
+      selfTest.adSkipIntent = { fromSec: video.currentTime, toSec: video.duration };
+      return;
+    }
+
+    try {
+      video.currentTime = video.duration;
+    } catch (e) {
+      shared.log('ad fast-forward failed', e);
+      return;
+    }
+
+    // Harmless, and still the right thing on older layouts where it works.
+    try { btn.click(); } catch (e) { /* ignore */ }
+
+    shared.log('skipped an ad (fast-forwarded to end)');
+    shared.bump({ adsSkipped: 1 });
   }
 
   // -------------------------------------------------- "Continue watching?" dialog
@@ -393,7 +443,7 @@
    * that stop this extension clicking a shopping link or a "delete comment"
    * confirm actually hold.
    */
-  var selfTest = { bypassQuiet: false };
+  var selfTest = { bypassQuiet: false, dryRunAdSkip: false, adSkipIntent: null };
 
   function expectClick(el, shouldClick, timeoutMs, done) {
     var got = false;
@@ -444,23 +494,77 @@
   }
 
   var CASES = {
+    /**
+     * Ads are no longer skipped by clicking — YouTube ignores synthetic clicks
+     * on its modern skip button — so this asserts the fast-forward intent
+     * instead, in dry-run so the user's real video is never seeked.
+     */
     adSkip: function (done) {
       var player = playerEl();
-      if (!player) return done({ pass: false, note: 'no player on page' });
+      var video = getVideo();
+      if (!player || !video) return done({ pass: false, note: 'no player on page' });
+
       var addedAdClass = !player.classList.contains('ad-showing');
       if (addedAdClass) player.classList.add('ad-showing');
 
+      selfTest.dryRunAdSkip = true;
+      selfTest.adSkipIntent = null;
+
       var slot = el('div', 'ytp-ad-skip-button-slot');
-      var btn = el('button', 'ytp-ad-skip-button-modern ytp-button', 'Skip');
-      btn.style.cssText = 'display:block;position:absolute;bottom:70px;right:12px;width:90px;height:32px;opacity:1;visibility:visible;z-index:9999';
+      var btn = el('button', 'ytp-skip-ad-button', 'Skip');
+      btn.style.cssText = 'display:block;position:absolute;bottom:70px;right:12px;' +
+        'width:90px;height:32px;opacity:1;visibility:visible;z-index:9999';
       slot.appendChild(btn);
       player.appendChild(slot);
 
-      expectClick(btn, true, 3000, function (r) {
+      var t0 = Date.now();
+      var iv = setInterval(function () {
+        var got = selfTest.adSkipIntent;
+        if (got || Date.now() - t0 > 3000) {
+          clearInterval(iv);
+          slot.remove();
+          if (addedAdClass) player.classList.remove('ad-showing');
+          selfTest.dryRunAdSkip = false;
+          selfTest.adSkipIntent = null;
+          done({
+            pass: !!got,
+            ms: Date.now() - t0,
+            note: got ? 'would fast-forward to the end of the ad' : 'never detected the skippable ad'
+          });
+        }
+      }, 60);
+    },
+
+    /**
+     * NEGATIVE: while the countdown is still running YouTube renders the button
+     * at 0x0. Acting then would cut into an ad the viewer is required to watch,
+     * and on a real video would seek them somewhere they never asked to go.
+     */
+    adSkipWaitsForCountdown: function (done) {
+      var player = playerEl();
+      var video = getVideo();
+      if (!player || !video) return done({ pass: false, note: 'no player on page' });
+
+      var addedAdClass = !player.classList.contains('ad-showing');
+      if (addedAdClass) player.classList.add('ad-showing');
+
+      selfTest.dryRunAdSkip = true;
+      selfTest.adSkipIntent = null;
+
+      var slot = el('div', 'ytp-ad-skip-button-slot');
+      var btn = el('button', 'ytp-skip-ad-button', 'Skip in 5');
+      btn.style.cssText = 'display:block;position:absolute;width:0;height:0;overflow:hidden';
+      slot.appendChild(btn);
+      player.appendChild(slot);
+
+      setTimeout(function () {
+        var acted = !!selfTest.adSkipIntent;
         slot.remove();
         if (addedAdClass) player.classList.remove('ad-showing');
-        done(r);
-      });
+        selfTest.dryRunAdSkip = false;
+        selfTest.adSkipIntent = null;
+        done({ pass: !acted, note: 'a still-counting-down ad must be left alone' });
+      }, 2000);
     },
 
     skipIntroChip: function (done) {

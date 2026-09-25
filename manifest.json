@@ -1,10 +1,13 @@
 {
   "manifest_version": 3,
   "name": "AutoSkip for YouTube",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Auto Jump Ahead for Premium, plus sponsor-segment skipping for everyone via SponsorBlock or your own LLM.",
   "minimum_chrome_version": "111",
-  "permissions": ["storage", "activeTab"],
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
   "host_permissions": [
     "*://*.youtube.com/*",
     "https://sponsor.ajay.app/*"
@@ -38,7 +41,10 @@
   },
   "content_scripts": [
     {
-      "matches": ["*://www.youtube.com/*", "*://m.youtube.com/*"],
+      "matches": [
+        "*://www.youtube.com/*",
+        "*://m.youtube.com/*"
+      ],
       "js": [
         "src/core/markers.js",
         "src/core/transcript.js",
@@ -50,7 +56,10 @@
       "all_frames": false
     },
     {
-      "matches": ["*://www.youtube.com/*", "*://m.youtube.com/*"],
+      "matches": [
+        "*://www.youtube.com/*",
+        "*://m.youtube.com/*"
+      ],
       "js": [
         "src/common/defaults.js",
         "src/core/transcript.js",
