@@ -187,6 +187,21 @@ captured data from YouTube and SponsorBlock.
 
 ---
 
+## Packaging for the Chrome Web Store
+
+```bash
+./scripts/package.sh
+```
+
+Builds `dist/autoskip-<version>.zip` containing only `manifest.json`, `src/` and
+`icons/`. It refuses to build if a test fails, a file the manifest references is
+missing, the version in the manifest and the console banner disagree, or any
+filename starts with `_` (Chrome rejects those). Bump `version` in both
+`manifest.json` and `src/main/inject.js` before each upload — the store rejects
+a version it has already seen.
+
+---
+
 ## Project layout
 
 | Path | Role |

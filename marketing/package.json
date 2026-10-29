@@ -1,0 +1,11 @@
+{
+  "name": "autoskip-marketing",
+  "private": true,
+  "description": "Renders the promo video. Not part of the extension.",
+  "type": "module",
+  "scripts": {
+    "setup": "npm install --prefix \"$HOME/.cache/autoskip-render\" --no-save --no-audit --no-fund puppeteer-core@24 ffmpeg-static@5",
+    "render": "node render.mjs",
+    "stills": "node render.mjs --stills"
+  }
+}
