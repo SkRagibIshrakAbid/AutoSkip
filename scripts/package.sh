@@ -5,7 +5,7 @@
 #   ./scripts/package.sh
 #
 # Ships only what the extension needs at runtime — manifest.json, src/, icons/.
-# Tests, fixtures, docs, marketing and this script stay out.
+# Tests, fixtures, docs and this script stay out.
 #
 # Refuses to build if anything is wrong, because a rejected or broken store
 # upload costs a review cycle (often days) to recover from.

@@ -58,59 +58,6 @@ Patching later does not reliably catch its requests.
 
 ---
 
-## Transcripts
-
-The obvious route is dead. `captionTracks[].baseUrl` now carries `exp=xpe` and
-returns **HTTP 200 with a zero-byte body** — even from inside the page with the
-user's own session. Forging `/youtubei/v1/get_transcript` fails too
-(`FAILED_PRECONDITION`). Both verified live.
-
-So transcripts come from YouTube's own traffic or DOM, cheapest first:
-
-1. **Intercept `/api/timedtext`** — fetched by YouTube itself to render captions.
-   Exact milliseconds, nothing on screen disturbed.
-2. **Intercept `/youtubei/v1/get_transcript`** — fires when the transcript panel
-   opens. Also exact.
-3. **Open the panel, scrape it, restore it.** ~1 second precision.
-
-### Deduplication
-
-Auto-captions repeat the same text on consecutive cues. Those are dropped — but
-only when **adjacent**. Deduplicating globally deletes legitimately repeated
-content (a song chorus, a catchphrase) and shifts every line index the model
-reasons about. `fixtures/panel-rows.sample.json` is a real transcript whose
-chorus repeats six times non-adjacently, and a test asserts those survive.
-
----
-
-## Why the LLM never emits timestamps
-
-A model asked for timestamps invents them, and an invented timestamp silently
-eats real content. It only ever receives indexed lines:
-
-```
-[0] hey everyone welcome back to the channel
-[1] before we start, today's video is sponsored by
-[2] NordVPN keeps your connection private and secure
-```
-
-It returns `{startLine, endLine, category, confidence, quote}`; line indices map
-back to times on our side. A segment is discarded when:
-
-- an index is out of range, or `endLine < startLine`
-- the `quote` does not appear in those lines (proof it read the transcript rather
-  than pattern-matching "this sounds sponsor-ish")
-- confidence is below threshold — default `0.7`
-- the span exceeds 25% of the video, or 6 minutes
-
-A fabricated timestamp is structurally impossible. The worst case is a rejected
-segment, never a silent skip of real content.
-
-If the prompt builder is ever changed, keep timestamps out of it. There is a test
-asserting the rendered prompt contains no clock-style times.
-
----
-
 ## SponsorBlock
 
 Only the hash-prefix endpoint is used: the first 4 hex characters of
@@ -165,20 +112,19 @@ one side of it.
 | Context | Holds | Because |
 |---|---|---|
 | **MAIN** | Player control, network capture | `seekTo()` is a page object; `fetch` must be patched before YouTube's scripts run |
-| **ISOLATED** | Settings, transcripts, toast, DOM actions | `chrome.*` APIs exist only here |
-| **Worker** | SponsorBlock + LLM calls, cache | Holds host permissions, and the API key must never touch the page |
+| **ISOLATED** | Settings, toast, DOM actions | `chrome.*` APIs exist only here |
+| **Worker** | SponsorBlock lookups, cache | Holds the host permission; one cache serves every tab |
 
 MAIN ↔ ISOLATED communicate via `window.postMessage` with an origin check.
 ISOLATED ↔ worker via `chrome.runtime.sendMessage`.
 
-### The API key rule
+### Never put a credential in `settings`
 
 `settings` is broadcast wholesale into the MAIN world, which shares scope with
-YouTube's own scripts. The API key therefore lives under a **separate storage
-key**, read only by the worker and the popup.
-
-Keep it that way. Filtering a secret out of a broadcast object is a mistake
-waiting to happen; storing it somewhere the broadcast never touches is not.
+YouTube's own scripts. Anything sensitive must live under a **separate storage
+key** the broadcast never touches — filtering a secret out of a broadcast object
+is a mistake waiting to happen. `test/segments.test.js` fails if a setting name
+looks like a key, token or secret.
 
 ### Segment sources are interchangeable
 
@@ -191,7 +137,7 @@ seeks. Adding a new source means emitting that shape — not touching the engine
 
 ## Testing without the real thing
 
-Neither Premium data nor an LLM key is needed to verify the logic.
+No Premium account or network access is needed to verify the logic.
 
 - `src/core/*.js` assign to `globalThis` and end with a `module.exports` guard,
   so the same file is both a content script and a Node module.
@@ -204,3 +150,81 @@ Neither Premium data nor an LLM key is needed to verify the logic.
 One wrinkle if you extend the self-test: `yt-confirm-dialog-renderer` is a live
 custom element, and children appended before it connects get wiped when Polymer
 upgrades it. Connect first, let the upgrade settle, then append.
+
+---
+
+## Archived: AI sponsor detection (removed in 0.4.0)
+
+Up to 0.3.x, when SponsorBlock had no data the extension read the video's
+transcript and asked an LLM — Ollama, any OpenAI-compatible endpoint,
+Anthropic or Gemini — to find the ad read. It was removed for the first store
+release: it needed broad optional host access, stored an API key, and sent
+transcripts to a third party, which was most of the extension's review risk and
+privacy surface for its least proven part.
+
+The code is in git: commit `0bdafa1` is the last one that contains it
+(`src/providers/llm.js`, `src/core/transcript.js`,
+`src/isolated/transcript-source.js`). The findings below are why it was built
+the way it was — read them before bringing it back.
+
+**One fix that was never committed.** The 0.3.x manifest declared provider
+hosts in `optional_host_permissions` but nothing ever called
+`chrome.permissions.request()`, so calls only worked when a provider happened to
+send CORS headers. A restored version must request the specific host from a
+user gesture in the popup (turning the feature on, or a "Test connection"
+button), and the worker should check `chrome.permissions.contains()` before each
+call so a missing grant produces an instruction instead of a network error.
+Chrome match patterns ignore the port, so `http://localhost:11434` is requested
+as `http://localhost/*`.
+
+### Transcripts
+
+The obvious route is dead. `captionTracks[].baseUrl` now carries `exp=xpe` and
+returns **HTTP 200 with a zero-byte body** — even from inside the page with the
+user's own session. Forging `/youtubei/v1/get_transcript` fails too
+(`FAILED_PRECONDITION`). Both verified live.
+
+So transcripts come from YouTube's own traffic or DOM, cheapest first:
+
+1. **Intercept `/api/timedtext`** — fetched by YouTube itself to render captions.
+   Exact milliseconds, nothing on screen disturbed.
+2. **Intercept `/youtubei/v1/get_transcript`** — fires when the transcript panel
+   opens. Also exact.
+3. **Open the panel, scrape it, restore it.** ~1 second precision.
+
+#### Deduplication
+
+Auto-captions repeat the same text on consecutive cues. Those are dropped — but
+only when **adjacent**. Deduplicating globally deletes legitimately repeated
+content (a song chorus, a catchphrase) and shifts every line index the model
+reasons about. `fixtures/panel-rows.sample.json` (in `0bdafa1`) is a real
+transcript whose chorus repeats six times non-adjacently, with a test asserting
+those survive.
+
+---
+
+### Why the LLM never emits timestamps
+
+A model asked for timestamps invents them, and an invented timestamp silently
+eats real content. It only ever receives indexed lines:
+
+```
+[0] hey everyone welcome back to the channel
+[1] before we start, today's video is sponsored by
+[2] NordVPN keeps your connection private and secure
+```
+
+It returns `{startLine, endLine, category, confidence, quote}`; line indices map
+back to times on our side. A segment is discarded when:
+
+- an index is out of range, or `endLine < startLine`
+- the `quote` does not appear in those lines (proof it read the transcript rather
+  than pattern-matching "this sounds sponsor-ish")
+- confidence is below threshold — default `0.7`
+- the span exceeds 25% of the video, or 6 minutes
+
+A fabricated timestamp is structurally impossible. The worst case is a rejected
+segment, never a silent skip of real content.
+
+If the prompt builder is restored, keep timestamps out of it — `0bdafa1` has a
+test asserting the rendered prompt contains no clock-style times.

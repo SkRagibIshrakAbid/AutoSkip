@@ -20,7 +20,7 @@
   if (globalThis.__autoskipMainLoaded) return;
   globalThis.__autoskipMainLoaded = true;
 
-  var VERSION = '0.3.1';
+  var VERSION = '0.4.0';
   var TAG = '__autoskip';
   var PREFIX = '[autoskip]';
 
@@ -65,8 +65,6 @@
         segments: [],
         jumpSegments: [],
         sponsorSegments: [],
-        transcriptLines: [],
-        transcriptPath: null,
         lastJump: null,
         rejected: [],
         titles: [],
@@ -114,13 +112,6 @@
       blocked = !!d.blocked;
     } else if (d.type === 'sponsor-segments') {
       if (d.videoId) applySponsorSegments(d.videoId, d.segments, d.meta);
-    } else if (d.type === 'transcript-request') {
-      var tst = videos.get(d.videoId);
-      post('transcript-response', {
-        videoId: d.videoId,
-        lines: tst ? tst.transcriptLines : [],
-        path: tst ? tst.transcriptPath : null
-      });
     } else if (d.type === 'undo-jump') {
       undoJump(d.videoId, d.rangeId);
     } else if (d.type === 'selftest-result') {
@@ -224,37 +215,6 @@
     });
   }
 
-  // ─────────────────────────────────────────────────── transcript capture
-
-  var T = globalThis.ASTranscript;
-
-  function videoIdFromUrl(url) {
-    try {
-      var m = String(url).match(/[?&]v=([A-Za-z0-9_-]{11})/);
-      return m ? m[1] : null;
-    } catch (e) { return null; }
-  }
-
-  function ingestTranscript(json, kind, url) {
-    if (!T) return;
-    var lines;
-    try {
-      lines = kind === 'timedtext' ? T.fromTimedText(json) : T.fromGetTranscript(json);
-    } catch (e) { return; }
-    if (!lines.length) return;
-
-    var videoId = videoIdFromUrl(url) || currentVideoId();
-    if (!videoId) return;
-
-    var st = stateFor(videoId);
-    // Prefer the richer capture if we already have one.
-    if (st.transcriptLines.length >= lines.length) return;
-    st.transcriptLines = lines;
-    st.transcriptPath = kind;
-    log('transcript captured via', kind, '-', lines.length, 'lines for', videoId);
-    post('transcript-ready', { videoId: videoId, lineCount: lines.length, path: kind });
-  }
-
   // ──────────────────────────────────────────── network / global capture
 
   /**
@@ -266,32 +226,18 @@
    */
   var INTERESTING = /\/youtubei\/v1\/(player|next|get_watch|reel_watch_sequence)(\?|$)/;
 
-  /**
-   * Transcript sources. /api/timedtext is fetched by YouTube itself to render
-   * captions, so catching it costs nothing and disturbs no UI; get_transcript
-   * fires when the transcript panel opens. Both carry exact millisecond
-   * timings, unlike scraping the panel's rendered "1:23" labels.
-   */
-  var TRANSCRIPT_RE = /\/(api\/timedtext|youtubei\/v1\/get_transcript)(\?|$)/;
-
-  function transcriptKind(url) {
-    return /api\/timedtext/.test(url) ? 'timedtext' : 'get_transcript';
-  }
-
   var nativeFetch = window.fetch;
   if (typeof nativeFetch === 'function') {
     window.fetch = function (input) {
       var url = '';
       try { url = typeof input === 'string' ? input : (input && input.url) || ''; } catch (e) {}
       var p = nativeFetch.apply(this, arguments);
-      if (url && (INTERESTING.test(url) || TRANSCRIPT_RE.test(url))) {
-        var isTranscript = TRANSCRIPT_RE.test(url);
+      if (url && INTERESTING.test(url)) {
         p.then(function (res) {
           try {
-            res.clone().json().then(function (j) {
-              if (isTranscript) ingestTranscript(j, transcriptKind(url), url);
-              else ingest(j, 'fetch ' + url.split('?')[0].split('/').pop());
-            }).catch(function () { /* timedtext can be XML; ignore */ });
+            res.clone().json()
+              .then(function (j) { ingest(j, 'fetch ' + url.split('?')[0].split('/').pop()); })
+              .catch(function () {});
           } catch (e) {}
           return res;
         }).catch(function () {});
@@ -309,7 +255,7 @@
   XMLHttpRequest.prototype.send = function () {
     var self = this;
     try {
-      if (self.__autoskipUrl && (INTERESTING.test(self.__autoskipUrl) || TRANSCRIPT_RE.test(self.__autoskipUrl))) {
+      if (self.__autoskipUrl && INTERESTING.test(self.__autoskipUrl)) {
         self.addEventListener('load', function () {
           try {
             var body = null;
@@ -318,13 +264,7 @@
             else if (self.responseType === '' || self.responseType === 'text') {
               body = self.responseText ? JSON.parse(self.responseText) : null;
             }
-            if (body) {
-              if (TRANSCRIPT_RE.test(self.__autoskipUrl)) {
-                ingestTranscript(body, transcriptKind(self.__autoskipUrl), self.__autoskipUrl);
-              } else {
-                ingest(body, 'xhr ' + String(self.__autoskipUrl).split('?')[0].split('/').pop());
-              }
-            }
+            if (body) ingest(body, 'xhr ' + String(self.__autoskipUrl).split('?')[0].split('/').pop());
           } catch (e) {}
         });
       }
@@ -609,20 +549,6 @@
       post('selftest-run', { only: only || null });
     },
 
-    /** What transcript we hold for this video, and which path produced it. */
-    transcript: function () {
-      var st = videos.get(currentVideoId());
-      if (!st || !st.transcriptLines.length) {
-        console.log(PREFIX + ' no transcript captured yet. It arrives when YouTube ' +
-          'fetches captions, or when the transcript panel is opened.');
-        return { lines: 0, path: null };
-      }
-      console.log(PREFIX + ' transcript: ' + st.transcriptLines.length + ' lines via ' + st.transcriptPath);
-      console.log('  first:', st.transcriptLines[0]);
-      console.log('  last :', st.transcriptLines[st.transcriptLines.length - 1]);
-      return { lines: st.transcriptLines.length, path: st.transcriptPath, sample: st.transcriptLines.slice(0, 5) };
-    },
-
     /** Inject a synthetic sponsor segment to exercise the skip + toast + undo. */
     simulateSponsor: function (inSeconds, lengthSeconds) {
       inSeconds = typeof inSeconds === 'number' ? inSeconds : 5;
@@ -667,9 +593,6 @@
       (s.rejected || []).forEach(function (r) { console.log('     ', r); });
       console.log('  jumps made     ', s.jumps, s.suspended ? '(SUSPENDED — you undid one)' : '');
       var st = videos.get(s.videoId);
-      console.log('  transcript     ', st && st.transcriptLines.length
-        ? st.transcriptLines.length + ' lines via ' + st.transcriptPath
-        : 'none captured');
       console.log('  sponsor segs   ', st && st.sponsorSegments ? st.sponsorSegments.length : 0,
         st && st.sponsorMeta ? JSON.stringify(st.sponsorMeta).slice(0, 160) : '');
       console.log('  settings       ', this.settings());

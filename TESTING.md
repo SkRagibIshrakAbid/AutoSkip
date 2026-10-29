@@ -21,7 +21,7 @@ Roughly 15 minutes for the core pass. Anything you notice beyond it is a bonus.
 You should see:
 
 ```
-[autoskip] v0.3.0 ready — __autoskip.report()
+[autoskip] v0.4.0 ready — __autoskip.report()
 ```
 
 If you don't see that line, stop here and tell me — nothing else will work.
@@ -121,27 +121,6 @@ This matters as much as the features working. Use YouTube normally for a bit:
 
 ---
 
-## 7 · Optional — the LLM path (only if you're up for it)
-
-Used only when SponsorBlock has no data for a video. Skip this section entirely
-if you'd rather not.
-
-**Private option:** install [Ollama](https://ollama.com), run
-`ollama pull llama3.1`, and start it with `OLLAMA_ORIGINS=*` set. Nothing leaves
-your machine.
-
-**Cloud option:** paste an API key for OpenAI / Anthropic / Gemini. Note that
-this sends video transcripts to that provider — don't do it if that bothers you,
-and use a key you can revoke.
-
-In the popup: enable **Use an LLM**, pick the provider, hit **Test connection**.
-
-- [ ] Test connection succeeds
-- [ ] On a video with an ad read that SponsorBlock doesn't cover, it eventually
-      finds and skips it (give it 10–30 seconds — it has to read the transcript)
-
----
-
 ## What to send me
 
 For anything that goes wrong:
@@ -165,9 +144,7 @@ video" is genuinely more useful than a stack trace.
 ## Known already — no need to report
 
 - Jump Ahead does nothing without Premium, or outside US/English videos
-- Sponsor skip does nothing on videos SponsorBlock hasn't covered, unless you
-  set up the LLM
-- The LLM path needs the video to have captions
+- Sponsor skip does nothing on videos SponsorBlock hasn't covered yet
 - The "Continue watching?" auto-dismiss is hard to test on purpose — it needs
   ~30 minutes of no interaction. The self-test covers the click path instead
 - Chrome's "developer mode extensions" startup warning

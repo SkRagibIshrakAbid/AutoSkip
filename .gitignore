@@ -28,6 +28,3 @@ yarn-error.log*
 # Local scratch
 *.local
 scratch/
-
-# Rendered promo video and stills (reproducible: cd marketing && npm run render)
-marketing/out/

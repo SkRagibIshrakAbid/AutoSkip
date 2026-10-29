@@ -24,8 +24,8 @@ AutoSkip closes both gaps:
 
 - **With Premium**, Jump Ahead becomes automatic, and whether the chip is visible
   stops mattering.
-- **Without it**, sponsor segments get skipped anyway — using the SponsorBlock
-  community database, and optionally an LLM you choose and control.
+- **Without it**, sponsor segments get skipped anyway, using the SponsorBlock
+  community database.
 
 Everything follows one principle: **a wrong skip must be cheap.** Never seek
 backwards, never re-skip the same segment, always leave a way out.
@@ -50,11 +50,8 @@ backwards, never re-skip the same segment, always leave a way out.
 
 **Pre-release.** Load it unpacked for now.
 
-Once testing is complete and every feature is confirmed working on real accounts
-— the LLM backends against live endpoints, the "Continue watching?" dialog
-against a real one, and sponsor skip across enough videos to trust it — this is
-headed for the **Chrome Web Store**. The open items are listed under
-[Known limits](#known-limits); they are the gate.
+Testing is complete and this is headed for the **Chrome Web Store**. Open
+items are listed under [Known limits](#known-limits).
 
 ---
 
@@ -65,8 +62,7 @@ headed for the **Chrome Web Store**. The open items are listed under
 3. **Load unpacked** → select this folder
 
 Requires **Chrome 111+**. Permissions: `storage`, `activeTab`, and host access to
-YouTube and SponsorBlock. LLM provider hosts are *optional* permissions,
-requested only if you turn that on.
+YouTube and SponsorBlock — nothing else.
 
 ---
 
@@ -83,29 +79,13 @@ by the server's own localized label so it works in any language.
 
 ### Sponsor skip
 
-**SponsorBlock first.** Free, instant, human-verified, and no transcript needed.
-Looked up by a short hash prefix, so the server never learns which video you are
-watching.
+Segments come from **SponsorBlock**, a free database of sponsor reads tagged and
+voted on by its community. Lookups use a short hash prefix, so the server never
+learns which video you are watching. Results are cached per video, so nothing is
+looked up twice.
 
-**Your own LLM second**, only when SponsorBlock has nothing:
-
-| Provider | Key needed | Notes |
-|---|---|---|
-| **Ollama** (local) | No | The transcript never leaves your machine |
-| **OpenAI-compatible** | Yes | Also covers Groq, OpenRouter, LM Studio, llama.cpp |
-| **Anthropic** | Yes | Claude |
-| **Google Gemini** | Yes | Has a usable free tier |
-
-Results are cached per video, so nothing is ever analysed twice. Transcripts come
-from YouTube's own caption data; videos without captions can't use this path, and
-the extension says so rather than looking broken.
-
-**The model never sees or produces a timestamp.** It works on numbered transcript
-lines and returns line numbers, which AutoSkip maps back to times itself. A
-segment is thrown away if the quote it cites isn't actually in those lines, if
-confidence is low, or if it would swallow an implausible chunk of the video. A
-fabricated timestamp is impossible by construction — the worst case is a segment
-that gets rejected.
+SponsorBlock covers popular channels well. A video nobody has tagged yet simply
+plays normally.
 
 ---
 
@@ -133,11 +113,8 @@ one you just opened yourself can never satisfy.
 
 - **No telemetry.** No analytics, no server of its own.
 - **SponsorBlock** only ever receives a short hash prefix, never the video id.
-- **Ollama** keeps transcripts entirely on your machine.
-- **Cloud providers do receive the transcript.** The popup says which, and what
-  it sends, before you enable it.
-- **Your API key is stored apart from ordinary settings** and is only ever read
-  by the extension's background worker — it never reaches the page.
+- **Nothing about you is stored anywhere but your own browser** — settings,
+  stats and the segment cache all stay local.
 
 ---
 
@@ -147,7 +124,6 @@ Open DevTools on any YouTube video:
 
 ```js
 __autoskip.report()          // what was captured, what was rejected, and why
-__autoskip.transcript()      // which transcript path won, and how many lines
 __autoskip.simulate()        // fake a Jump Ahead segment 5s ahead
 __autoskip.simulateSponsor() // fake a sponsor segment → skip + toast + Undo
 __autoskip.selftest()        // exercise ad-skip, chips and dialogs (~15s)
@@ -179,10 +155,10 @@ loaded.
 
 ```bash
 node test/markers.test.js     # Jump Ahead engine
-node test/segments.test.js    # sponsor segments + transcripts
+node test/segments.test.js    # sponsor segments
 ```
 
-56 tests. No browser, no Premium account, no API key. Fixtures include real
+39 tests. No browser, no Premium account. Fixtures include real
 captured data from YouTube and SponsorBlock.
 
 ---
@@ -208,10 +184,10 @@ a version it has already seen.
 |---|---|
 | `src/core/` | Pure logic — parsing, validation, decisions. Runs in Node for tests |
 | `src/main/` | Player control and data capture |
-| `src/isolated/` | Settings bridge, transcripts, toast, DOM actions |
-| `src/providers/` | SponsorBlock and LLM clients |
+| `src/isolated/` | Settings bridge, toast, DOM actions |
+| `src/providers/` | SponsorBlock client |
 | `src/popup/` | Settings UI |
-| `src/sw.js` | Background worker — orchestration, cache, API keys |
+| `src/sw.js` | Background worker — SponsorBlock lookups and cache |
 
 Implementation notes, and the YouTube payload quirks worth knowing before
 changing any of this, are in **[docs/INTERNALS.md](docs/INTERNALS.md)**.
@@ -219,6 +195,42 @@ changing any of this, are in **[docs/INTERNALS.md](docs/INTERNALS.md)**.
 ---
 
 ## Changelog
+
+### 0.4.0 — Launch build
+
+**Removed**
+- **The AI sponsor-detection feature**, for the first store release. It needed
+  broad optional host access, stored an API key, and sent transcripts to a third
+  party — most of the extension's review risk and privacy surface, for its least
+  proven part. Sponsor skip now uses SponsorBlock alone. It can return in a later
+  update; the code is in git history.
+
+**Changed**
+- Permissions are now just YouTube and SponsorBlock, plus `storage` and
+  `activeTab`. Two new tests fail if a host permission is ever added back, or if
+  a setting could hold a credential.
+- An API key saved by an earlier build is deleted on update, and old cached
+  results are cleared.
+- Turning Sponsor skip on now works on the video already open, not only after
+  the next one loads.
+
+**Fixed**
+- A SponsorBlock network failure was cached as "this video has no sponsors" for
+  a week. Only real answers are cached now, and a failed lookup is retried.
+
+### 0.3.2 — AI providers ask before connecting
+
+**Fixed**
+- **AI provider access was never actually requested.** The manifest declared
+  provider hosts as optional permissions, but nothing asked for them — so calls
+  only worked when a provider happened to allow cross-site requests, and custom
+  endpoints could fail silently. Turning the AI on, switching provider, or
+  clicking **Test connection** now asks Chrome for access to that specific host.
+- Without access, the extension now says exactly what to do instead of failing
+  with a network error.
+
+**Changed**
+- Clearer store summary that says which features need Premium.
 
 ### 0.3.1 — Ad skip actually skips
 
@@ -288,12 +300,13 @@ popup, blocklist, diagnostics.
 - **Jump Ahead is Premium-only**, and was limited to English-language videos in
   the US at the time of writing. Elsewhere it is correctly inert — sponsor skip
   still works.
-- **The LLM path needs captions.** SponsorBlock doesn't.
-- **The four LLM clients have not been tested against live endpoints.** The
-  popup's **Test connection** button exists because that's a claim only you can
-  confirm with your own key.
+- **Sponsor skip only covers videos SponsorBlock knows about.** Untagged videos
+  play normally.
 - **The "Continue watching?" selectors** were never confirmed against a real
   dialog. Capture mode will log the real element if it misses.
+- **"Skip intro" chips are clicked synthetically**, and YouTube ignores
+  synthetic clicks on its ad Skip button. They haven't been confirmed against a
+  real chip, so the store listing doesn't advertise them.
 - **YouTube changes things.** When it does, `__autoskip.report()` shows what was
   rejected and why.
 

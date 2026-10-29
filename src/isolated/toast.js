@@ -1,10 +1,10 @@
 /**
  * AutoSkip — skip toast with Undo (isolated world).
  *
- * Sponsor segments come from heuristics — community votes or an LLM — not from
- * YouTube's own data, so a wrong skip is possible in a way it is not for Jump
- * Ahead. Showing what was skipped and offering one-tap Undo is what makes
- * automatic skipping acceptable rather than alarming.
+ * Sponsor segments come from community votes, not YouTube's own data, so a
+ * wrong skip is possible in a way it is not for Jump Ahead. Showing what was
+ * skipped and offering one-tap Undo is what makes automatic skipping
+ * acceptable rather than alarming.
  */
 (function () {
   'use strict';
